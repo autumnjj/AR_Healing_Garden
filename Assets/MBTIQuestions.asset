@@ -1,0 +1,101 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bb664a104c87874c8d730711b88998f, type: 3}
+  m_Name: MBTIQuestions
+  m_EditorClassIdentifier: 
+  questions:
+  - questionText: "\"\uC0C8\uB85C\uC6B4 \uD658\uACBD\uC5D0\uC11C \uC5B4\uB5BB\uAC8C
+      \uC5D0\uB108\uC9C0\uB97C \uC5BB\uB098\uC694?\""
+    optionA: "\"\uC0AC\uB78C\uB4E4\uACFC \uB300\uD654\uD558\uBA70 \uD65C\uB825\uC744
+      \uC5BB\uB294\uB2E4\""
+    optionB: "\"\uD63C\uC790 \uC870\uC6A9\uD55C \uC2DC\uAC04\uC744 \uAC00\uC9C0\uBA70
+      \uC7AC\uCDA9\uC804\uD55C\uB2E4\""
+    dimension: EI
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uC2A4\uD2B8\uB808\uC2A4\uB97C \uBC1B\uC744 \uB54C \uAC00\uC7A5
+      \uBA3C\uC800 \uD558\uACE0 \uC2F6\uC740 \uAC83\uC740?\""
+    optionA: "\"\uCE5C\uAD6C\uB4E4\uACFC \uB9CC\uB098\uC11C \uC774\uC57C\uAE30\uD558\uACE0
+      \uC2F6\uB2E4\""
+    optionB: "\"\uD63C\uC790\uB9CC\uC758 \uC2DC\uAC04\uC744 \uAC00\uC9C0\uBA70 \uC815\uB9AC\uD558\uACE0
+      \uC2F6\uB2E4\""
+    dimension: EI
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uC2DD\uBB3C\uC744 \uD0A4\uC6B8 \uB54C \uC911\uC694\uD558\uAC8C
+      \uC0DD\uAC01\uD558\uB294 \uAC83\uC740?\""
+    optionA: "\"\uAD6C\uCCB4\uC801\uC778 \uAD00\uB9AC \uBC29\uBC95\uACFC \uC2E4\uC6A9\uC801
+      \uD6A8\uACFC\""
+    optionB: "\"\uC2DD\uBB3C\uC758 \uC758\uBBF8\uC640 \uC0C1\uC9D5\uC801 \uAC00\uCE58\""
+    dimension: SN
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uC0C8\uB85C\uC6B4 \uC2DD\uBB3C\uC744 \uC120\uD0DD\uD560 \uB54C
+      \uBB34\uC5C7\uC744 \uBA3C\uC800 \uACE0\uB824\uD558\uB098\uC694?\""
+    optionA: "\"\uD0A4\uC6B0\uAE30 \uC26C\uC6C0, \uAD00\uB9AC \uBC29\uBC95, \uC2E4\uC81C
+      \uACBD\uD5D8\uB2F4\""
+    optionB: "\"\uB3C5\uD2B9\uD568, \uC0C1\uC9D5\uC801 \uC758\uBBF8, \uBBF8\uB798
+      \uAC00\uB2A5\uC131\""
+    dimension: SN
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uC2DD\uBB3C\uC774 \uC2DC\uB4E4 \uB54C \uC5B4\uB5A4 \uB9C8\uC74C\uC774
+      \uB4DC\uB098\uC694?\""
+    optionA: "\"\uC6D0\uC778\uC744 \uBD84\uC11D\uD558\uACE0 \uD574\uACB0\uCC45\uC744
+      \uCC3E\uB294\uB2E4\""
+    optionB: "\"\uBBF8\uC548\uD558\uACE0 \uC548\uC4F0\uB7EC\uC6B4 \uB9C8\uC74C\uC774
+      \uB4E0\uB2E4\""
+    dimension: TF
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uD300 \uD504\uB85C\uC81D\uD2B8\uC5D0\uC11C \uC758\uACAC \uCDA9\uB3CC\uC774
+      \uC0DD\uACBC\uC744 \uB54C?\""
+    optionA: "\"\uCCB4\uACC4\uC801\uC778 \uC815\uB9AC\uB098 \uACC4\uD68D \uC138\uC6B0\uAE30\""
+    optionB: "\"\uCC3D\uC758\uC801 \uD65C\uB3D9\uC774\uB098 \uC0C8\uB85C\uC6B4 \uC2DC\uB3C4\""
+    dimension: Mixed_TF
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uC2DD\uBB3C \uAD00\uB9AC \uC2A4\uCF00\uC904\uC744 \uC5B4\uB5BB\uAC8C
+      \uC815\uD558\uB098\uC694?\""
+    optionA: "\"\uC815\uD574\uC9C4 \uC2DC\uAC04\uC5D0 \uADDC\uCE59\uC801\uC73C\uB85C
+      \uAD00\uB9AC\""
+    optionB: "\"\uC0C1\uD669\uC5D0 \uB530\uB77C \uC720\uC5F0\uD558\uAC8C \uAD00\uB9AC\""
+    dimension: JP
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uC5EC\uD589 \uACC4\uD68D\uC744 \uC138\uC6B8 \uB54C \uC120\uD638\uD558\uB294
+      \uBC29\uC2DD\uC740?\""
+    optionA: "\"\uC138\uBD80 \uC77C\uC815\uACFC \uC608\uC57D\uC744 \uBBF8\uB9AC \uC644\uBCBD\uD558\uAC8C
+      \uC900\uBE44\""
+    optionB: "\"\uD070 \uD2C0\uB9CC \uC815\uD558\uACE0 \uD604\uC9C0\uC5D0\uC11C \uC989\uD765\uC801\uC73C\uB85C
+      \uACB0\uC815\""
+    dimension: JP
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: "\"\uD798\uB4E0 \uC2DC\uAE30\uB97C \uADF9\uBCF5\uD558\uB294 \uB098\uB9CC\uC758
+      \uBC29\uBC95\uC740?\""
+    optionA: "\"\uCCB4\uACC4\uC801\uC73C\uB85C \uBD84\uC11D\uD558\uACE0 \uC7A5\uAE30\uC801
+      \uACC4\uD68D\uC744 \uC138\uC6B4\uB2E4\""
+    optionB: "\"\uAC10\uC815\uC744 \uC778\uC815\uD558\uACE0 \uC8FC\uBCC0 \uC0AC\uB78C\uB4E4\uACFC
+      \uD568\uAED8\uD55C\uB2E4\""
+    dimension: Mixed_TF
+    optionAValue: 1
+    optionBValue: -1
+  - questionText: " \"\uC0C8\uB85C\uC6B4 \uB3C4\uC804 \uC55E\uC5D0\uC11C \uB098\uC758
+      \uBAA8\uC2B5\uC740?\""
+    optionA: " \"\uC548\uC815\uC801\uC774\uACE0 \uAC80\uC99D\uB41C \uBC29\uBC95\uC744
+      \uC120\uD638\uD55C\uB2E4\""
+    optionB: "\"\uCC3D\uC758\uC801\uC774\uACE0 \uD601\uC2E0\uC801\uC778 \uC811\uADFC\uC744
+      \uC2DC\uB3C4\uD55C\uB2E4\""
+    dimension: Mixed_SN
+    optionAValue: 1
+    optionBValue: -1

@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d276dc07a9b9b3428d635f2263c4069, type: 3}
+  m_Name: Plant_Cactus
+  m_EditorClassIdentifier: 
+  plantId: cactus_001
+  plantName: Cactus
+  koreanName: "\uC120\uC778\uC7A5"
+  plantImage: {fileID: 0}
+  plantPrefab: {fileID: 0}
+  primaryMBTI:
+  - '"ISTP"'
+  secondaryMBTI:
+  - ISTJ
+  - ESTP
+  symolism: "\"\uC790\uB9BD\uACFC \uAC15\uC778\uD568\""
+  careMessages:
+  - "\"\uC790\uB9BD\uC801\uC778 \uC131\uC7A5\uC774 \uBA4B\uC838\uC694\""
+  - "\"\uAC15\uC778\uD55C \uC0DD\uBA85\uB825\uC774 \uB290\uAEF4\uC838\uC694\""
+  - "\"\uC2E4\uC6A9\uC801\uC778 \uC544\uB984\uB2E4\uC6C0\uC744 \uBCF4\uC5EC\uC8FC\uACE0
+    \uC788\uC5B4\uC694\""
+  - "\"\uB3C5\uB9BD\uC801\uC778 \uBAA8\uC2B5\uC774 \uC778\uC0C1\uC801\uC774\uC5B4\uC694\""
+  - "\"\uC720\uC5F0\uD55C \uC801\uC751\uB825\uC774 \uB180\uB77C\uC6CC\uC694\""
+  - "\"\uAC04\uACB0\uD55C \uB9E4\uB825\uC774 \uD2B9\uBCC4\uD574\uC694\""
+  - "\"\uD604\uC2E4\uC801\uC778 \uC9C0\uD61C\uB97C \uBCF4\uC5EC\uC8FC\uACE0 \uC788\uC5B4\uC694\""
+  growthStages: []

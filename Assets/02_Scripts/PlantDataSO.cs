@@ -1,0 +1,24 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+[CreateAssetMenu(fileName = "PlantData", menuName = "BloomSpeak/PlantData")]
+public class PlantDataSO : ScriptableObject
+{
+    [Header("기본 정보")]
+    public string plantId;
+    public string plantName;
+    public string koreanName;
+    public Sprite plantImage;
+    public GameObject plantPrefab;
+
+    [Header("MBIT 매칭")]
+    public List<string> primaryMBTI = new List<string>();
+    public List<string> secondaryMBTI = new List<string>();
+
+    [Header("식물 특성")]
+    public string symolism;
+    public List<string> careMessages = new List<string>();
+
+    [Header("성장 단계")]
+    public List<Sprite> growthStages = new List<Sprite>();  // 씨앗, 새싹, 성장, 개화
+}
