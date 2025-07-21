@@ -15,6 +15,10 @@ public class PlantGrowthManager : MonoBehaviour
     public bool startWithMBTIResult = true;
     public bool enableAutoDecay = true;
 
+    [Header("Resources 경로 설정")]
+    [SerializeField]
+    private string plantDataResourcesPath = "PlantData";
+
     private void Start()
     {
         InitializeComponents();
@@ -30,7 +34,7 @@ public class PlantGrowthManager : MonoBehaviour
             StartCoroutine(AutoDecayRoutine());
         }
 
-        Debug.Log("PlantGrowthManager 초기화 완료");
+        Debug.Log("PlantGrowthManager init done");
     }
 
     private void InitializeComponents()
@@ -55,11 +59,11 @@ public class PlantGrowthManager : MonoBehaviour
         }
 
         // 누락된 컴포넌트 경고
-        if(plantGrowthData == null) Debug.LogError("PlantGrowthData 컴포넌트를 찾을 수 없습니다.");
+        if(plantGrowthData == null) Debug.LogError("Can not Find PlantGrowthData component.");
 
-        if(interactionSystem == null) Debug.LogError("PlantInteractionSystem 컴포넌트를 찾을 수 없습니다.");
+        if(interactionSystem == null) Debug.LogError("Cannot find PlantInteractionSystem component.");
 
-        if(growthUI == null) Debug.LogError("PlantGrowthUI 컴포넌트를 찾을 수 없습니다.");
+        if(growthUI == null) Debug.LogError("Cannot Find PlantGrowthUI component.");
     }
 
     private void ConnectEvents()
@@ -85,7 +89,39 @@ public class PlantGrowthManager : MonoBehaviour
             if(userData != null && userData.HasData())
             {
                 SetPlantFromMBTI(userData.matchedPlantId);
+                return;
             }
+        }
+
+        // MBTIManager가 없거나 데이터가 없는 경우 직접 PlayerPrefs에서 로드
+        string mbtiType = PlayerPrefs.GetString("MBTI_Type", "");
+        string matchedPlantId = PlayerPrefs.GetString("Matched_Plant", "");
+
+        if (!string.IsNullOrEmpty(mbtiType) && !string.IsNullOrEmpty(matchedPlantId))
+        {
+            Debug.Log($"MBTI result load : {mbtiType} -> {matchedPlantId}");
+
+            PlantDataSO matchedPlant = FindPlantDataById(matchedPlantId);
+            if (matchedPlant != null)
+            {
+                SetPlantData(matchedPlant);
+
+                // 환영 메시지
+                if (growthUI != null)
+                {
+                    growthUI.ShowMessage($"{matchedPlant.koreanName}과 함께 성장해보세요!", Color.green);
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"식물 ID '{matchedPlantId}'를 찾을 수 없습니다. 기본 식물 사용.");
+                SetDefaultPlant();
+            }
+        }
+        else
+        {
+            Debug.Log("MBTI 테스트 결과가 없습니다. 기본 식물 사용.");
+            SetDefaultPlant();
         }
     }
 
@@ -123,41 +159,6 @@ public class PlantGrowthManager : MonoBehaviour
         }
     }
 
-    private void LoadMBTIResult()
-    {
-        // PlayerPrefs에서 MBTI 결과 로드
-        string mbtiType = PlayerPrefs.GetString("MBTI_Type", "");
-        string matchedPlantId = PlayerPrefs.GetString("Matched_Plant", "");
-
-        if (!string.IsNullOrEmpty(mbtiType) && !string .IsNullOrEmpty(matchedPlantId))
-        {
-            Debug.Log($"MBTI 결과 로드 : {mbtiType} -> {matchedPlantId}");
-
-            // 해당 식물 데이터 찾기
-            PlantDataSO matchedPlant = FindPlantDataById(matchedPlantId);
-            if (matchedPlant != null) 
-            {
-                SetPlantData(matchedPlant);
-
-                // 환영 메시지
-                if(growthUI != null)
-                {
-                    growthUI.ShowMessage($"{matchedPlant.koreanName}과 함께 성장해보세요!", Color.green);
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"식물 ID '{matchedPlantId}'를 찾을 수 없습니다. 기본 식물 사용.");
-                SetDefaultPlant();
-            }
-        }
-        else
-        {
-            Debug.Log("MBTI 테스트 결과가 없습니다. 기본 식물 사용.");
-            SetDefaultPlant();
-        }
-    }
-
     PlantDataSO FindPlantDataById(string plantId)
     {
         // MBTIManager가 씬에 있으면 그것을 사용
@@ -172,7 +173,7 @@ public class PlantGrowthManager : MonoBehaviour
             }
         }
         // MBTIManager가 없으면 모든 PlantDataSO assets 검색
-        PlantDataSO[] allPlants = FindAllPlantAssets();
+        PlantDataSO[] allPlants = LoadAllPlantAssets();
 
         foreach(var plant in allPlants)
         {
@@ -185,17 +186,19 @@ public class PlantGrowthManager : MonoBehaviour
         return null;
     }
 
-    PlantDataSO[] FindAllPlantAssets()
+    PlantDataSO[] LoadAllPlantAssets()
     {
-        // Project의 모든 PlantDataSO asset찾기
-        string[] guids = UnityEditor.AssetDatabase.FindAssets("t:PlantDataSO");
-        PlantDataSO[] plants = new PlantDataSO[guids.Length];
+        PlantDataSO[] plants = Resources.LoadAll<PlantDataSO>(plantDataResourcesPath);
 
-        for (int i = 0; i < guids.Length; i++)
-        { 
-            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[i]);
-            plants[i] = UnityEditor.AssetDatabase.LoadAssetAtPath<PlantDataSO>(path);
+        if(plants.Length == 0)
+        {
+            Debug.LogWarning($"Resources/{plantDataResourcesPath}/Cannot Find PlantDataSO");
         }
+        else
+        {
+            Debug.Log($"Resources {plants.Length}개의 식물 데이터를 로드했습니다.");
+        }
+
         return plants;
     }
 
@@ -203,7 +206,7 @@ public class PlantGrowthManager : MonoBehaviour
     private void SetDefaultPlant()
     {
         // 첫 번째 식물을 기본값으로 사용
-        PlantDataSO[] allPlants = FindAllPlantAssets();
+        PlantDataSO[] allPlants = LoadAllPlantAssets();
         if(allPlants.Length > 0 && allPlants[0] != null)
         {
             SetPlantData(allPlants[0]);
@@ -211,7 +214,7 @@ public class PlantGrowthManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("사용 가능한 식물 데이터가 없습니다.");
+            Debug.LogError("There is no availabe plant data");
         }
     }
 

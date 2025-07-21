@@ -7,6 +7,12 @@ public class MBTIManager : MonoBehaviour
     public MBTIQuestionsSO questionsData;
     public List<PlantDataSO> plantDatabase = new List<PlantDataSO>();
 
+    [Header("Resources 경로 설정")]
+    [SerializeField]
+    private string questionsResourcePath = "MBTI/MBTIQuestions";
+    [SerializeField]
+    private string plantDataResouresPath = "PlantData";
+
     [Header("현재 상태")]
     private Dictionary<string, float> currentScores;
     private int currentQuestionIndex = 0;
@@ -18,6 +24,7 @@ public class MBTIManager : MonoBehaviour
 
     private void Start()
     {
+        LoadDataFromResources();
         InitializeScores();
         LoadUserData();
 
@@ -30,6 +37,36 @@ public class MBTIManager : MonoBehaviour
         else
         {
             StartTest();
+        }
+    }
+
+    private void LoadDataFromResources()
+    {
+        if(questionsData == null)
+        {
+            questionsData = Resources.Load<MBTIQuestionsSO>(questionsResourcePath);
+            if (questionsData == null)
+            {
+                Debug.LogError($"Resources/{questionsResourcePath} cannot find MBTIQuestionsSO.");
+            }
+            else
+            {
+                Debug.Log("Resources Folder Load MBTI Questions Data");
+            }
+        }
+
+        if (plantDatabase.Count == 0)
+        {
+            PlantDataSO[] plants = Resources.LoadAll<PlantDataSO>(plantDataResouresPath);
+            if(plants.Length > 0)
+            {
+                plantDatabase.AddRange(plants);
+                Debug.Log($"Resources Folder Load {plants.Length} plant data");
+            }
+            else
+            {
+                Debug.LogWarning($"Resources/{plantDataResouresPath} cannot find PlantDataSO");
+            }
         }
     }
 
@@ -53,6 +90,11 @@ public class MBTIManager : MonoBehaviour
 
     public void StartTest()
     {
+        if(questionsData == null)
+        {
+            Debug.LogError("questionsData is null. Did not load in Resources Folder");
+            return;
+        }
         currentQuestionIndex = 0;
         InitializeScores();
         ShowCurrentQuestion();
@@ -66,7 +108,7 @@ public class MBTIManager : MonoBehaviour
 
     private void ShowCurrentQuestion()
     {
-        if(currentQuestionIndex < questionsData.questions.Count)
+        if(questionsData != null && currentQuestionIndex < questionsData.questions.Count)
         {
             OnQuestionChanged?.Invoke(questionsData.questions[currentQuestionIndex]);
         }
@@ -74,8 +116,7 @@ public class MBTIManager : MonoBehaviour
 
     public void AnswerQuestion(int optionIndex) // 0 : A선택지, 1: B선택지
     {
-        if (currentQuestionIndex >= questionsData.questions.Count) return;
-
+        if (questionsData == null || currentQuestionIndex >= questionsData.questions.Count) return;
 
         var question = questionsData.questions[currentQuestionIndex];
         float scoreValue = (optionIndex == 0) ? question.optionAValue : question.optionBValue;
@@ -100,7 +141,7 @@ public class MBTIManager : MonoBehaviour
         {
             if (currentScores.ContainsKey("SN")) currentScores["SN"] += scoreValue * 0.5f;
         }
-        else // 창의적
+        else 
         {
             if (currentScores.ContainsKey(question.dimension))
             {
@@ -158,6 +199,12 @@ public class MBTIManager : MonoBehaviour
 
     PlantDataSO FindBestMatchingPlant(string mbtiType)
     {
+        if (plantDatabase.Count == 0)
+        {
+            Debug.LogError("PlantDatabase is empty");
+            return null;
+        }
+
         // 1순위 : 완전 매칭
         foreach(var plant in plantDatabase)
         {
@@ -214,13 +261,13 @@ public class MBTIManager : MonoBehaviour
                 return plant;
             }
         }
-        return plantDatabase[0]; //  기본값
+        return plantDatabase.Count > 0 ? plantDatabase[0] : null; //  기본값
     }
 
 
     // UI에서 사용할 메서드들
     public int GetCurrentQuestionIndex() => currentQuestionIndex;
-    public int GetTotalQuestions() => questionsData.questions.Count;
-    public float GetProgress() => (float) currentQuestionIndex / questionsData.questions.Count;
+    public int GetTotalQuestions() => questionsData != null ? questionsData.questions.Count : 0;
+    public float GetProgress() => questionsData != null ? (float) currentQuestionIndex / questionsData.questions.Count : 0f;
     public UserPersonalityData GetUserData() => userData;
 }

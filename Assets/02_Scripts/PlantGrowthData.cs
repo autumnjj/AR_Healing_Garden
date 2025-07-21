@@ -1,6 +1,5 @@
-using UnityEngine;
 using System.Collections.Generic;
-using UnityEditor.PackageManager.Requests;
+using UnityEngine;
 
 public enum PlantGrowthStage
 {
@@ -68,7 +67,7 @@ public class PlantCurrentState
         currentStage = PlantGrowthStage.Seed;
         currentGrowthPoints = 0f;
         lastInteractionTime = 0f;
-        lastDecayTime = Time.time;
+        lastDecayTime = 0f;
         totalInteractions = 0;
         interactionCounts = new Dictionary<InteractionType, int>();
 
