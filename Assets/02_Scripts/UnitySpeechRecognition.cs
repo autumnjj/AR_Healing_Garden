@@ -3,8 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
-using System.Data;
-
+using static Unity.Android.Gradle.Manifest.Permission;
 
 #if UNITY_ANDROID
 using UnityEngine.Android;
@@ -32,6 +31,7 @@ public class UnitySpeechRecognition : MonoBehaviour
 
     // 상태
     private bool isListening = false;
+    private bool isinitialized = false;
     private string currentTarget = "";
     private int currentCount = 0;
     private int dailyTargetIndex = 0;
@@ -56,10 +56,51 @@ public class UnitySpeechRecognition : MonoBehaviour
     {
         LoadDataFromResources();
         SetupUI();
-        LoadNextTarget();
+        StartCoroutine(InitializeWithPermissions());
         InitializeSpeechRecognition();
     }
 
+    private IEnumerator InitializeWithPermissions()
+    {
+        // 권한 요청
+        yield return StartCoroutine(RequestPermissions());
+
+        // 음성 인식 초기화
+        InitializeSpeechRecognition();
+
+        // 첫 번째 목표 로드
+        LoadNextTarget();
+    }
+
+    private IEnumerator RequestPermissions()
+    {
+        UpdateStatus("권한을 확인하는 중...");
+
+#if UNITY_ANDROID
+        // 마이크 권한 확인 및 요청
+        if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
+        {
+            UpdateStatus("마이크 권한을 요청합니다...");
+            Permission.RequestUserPermission(Permission.Microphone);
+
+            // 권한 응답 대기
+            float timeout = 0f;
+            while(!Permission.HasUserAuthorizedPermission(Permission.Microphone) && timeout < 10f)
+            {
+                timeout += Time.deltaTime;
+                yield return null;
+            }
+
+            if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
+            {
+                UpdateStatus("마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.");
+                yield break;
+            }
+        }
+        UpdateStatus("권한이 승인되었습니다.");
+#endif
+        yield return new WaitForSeconds(0.5f);
+    }
     private void LoadDataFromResources()
     {
         if(speechData == null)
@@ -87,6 +128,9 @@ public class UnitySpeechRecognition : MonoBehaviour
     {
 #if UNITY_ANDROID 
     SetupAndroidSpeechRecognition();
+#else
+    UpdateStatus("에디터에서는 시뮬레이션 모드로 동작합니다.");
+    isInitialized = true;
 #endif
     }
 
@@ -99,6 +143,12 @@ public class UnitySpeechRecognition : MonoBehaviour
             AndroidJavaClass unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
             currentActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
 
+            if (currentActivity == null)
+            {
+                UpdateStatus("Unity Activity를 가져올 수 없습니다.");
+                return;
+            }
+
             // SpeechRecognizer 생성
             AndroidJavaClass speechClass = new AndroidJavaClass("android.speech.SpeechRecognizer");
 
@@ -109,21 +159,30 @@ public class UnitySpeechRecognition : MonoBehaviour
             {
                 speechRecognizer = speechClass.CallStatic<AndroidJavaObject>("createSpeechRecognizer", currentActivity);
 
-                // 콜백 리스너 생성
-                speechCallback = new SpeechRecognitionCallback(this);
-                speechRecognizer.Call("setRecognitionListener", speechCallback);
+                if(speechRecognizer != null)
+                {
+                    // 콜백 리스너 생성
+                    speechCallback = new SpeechRecognitionCallback(this);
+                    speechRecognizer.Call("setRecognitionListener", speechCallback);
 
-                UpdateStatus("음성 인식 준비 완료");
+                    isinitialized = true;
+                    UpdateStatus("음성 인식 준비 완료");
+                    Debug.Log("Android 음성 인식 초기화 성공");
+                }
+                else
+                {
+                    UpdateStatus("SpeechRecognizer 생성에 실패했습니다.");
+                }
             }
             else
             {
-                UpdateStatus("음성 인식을 사용할 수 없습니다");
+                UpdateStatus("이 기기에서는 음성 인식을 사용할 수 없습니다");
             }
         }
         catch (System.Exception e)
         {
             Debug.LogError("Speech Recognition 초기화 실패: " + e.Message);
-            UpdateStatus("음성 인식 초기화 실패");
+            UpdateStatus("음성 인식 초기화 실패: " + e.Message);
         }
     }
 #endif
@@ -139,6 +198,7 @@ public class UnitySpeechRecognition : MonoBehaviour
         else
         {
             // 모든 목표 완료
+            UpdateStatus("오늘의 목표를 모두 완료했어요!");
             if (statusText != null)
                 statusText.text = "오늘의 목표를 모두 완료했어요!";
         }
@@ -146,6 +206,12 @@ public class UnitySpeechRecognition : MonoBehaviour
 
     public void ToggleListening()
     {
+        if (!isinitialized)
+        {
+            UpdateStatus("음성 인식이 초기화되지 않았습니다.");
+            return;
+        }
+
         if (isListening)
             StopListening();
         else
@@ -156,7 +222,7 @@ public class UnitySpeechRecognition : MonoBehaviour
     {
 #if UNITY_ANDROID
 
-        if (speechRecognizer == null)
+        if (speechRecognizer == null || !isinitialized)
         {
             UpdateStatus("음성 인식기가 준비되지 않았습니다.");
             return;
@@ -184,13 +250,19 @@ public class UnitySpeechRecognition : MonoBehaviour
             
             intent.Call<AndroidJavaObject>("putExtra", 
                 recognizerIntentClass.GetStatic<string>("EXTRA_PARTIAL_RESULTS"), true);
-            
+
+            intent.Call<AndroidJavaObject>("putExtra",
+                recognizerIntentClass.GetStatic<string>("EXTRA_CALLING_PACKAGE"),
+                currentActivity.Call<string>("getPackageName"));
+
             // 음성 인식 시작
             speechRecognizer.Call("startListening", intent);
             
             isListening = true;
-            UpdateStatus("듣고 있습니다... ??");
+            UpdateStatus("듣고 있습니다...");
             UpdateUI();
+
+            Debug.Log("Voice Recog start");
         }
         catch (System.Exception e)
         {
@@ -212,6 +284,7 @@ public class UnitySpeechRecognition : MonoBehaviour
             try
             {
                 speechRecognizer.Call("stopListening");
+                Debug.Log("Voice Recog Stop");
             }
             catch(System.Exception e)
             {
@@ -254,8 +327,35 @@ public class UnitySpeechRecognition : MonoBehaviour
     public void OnSpeechRecognitionError(string errorCode)
     {
         Debug.LogError("음성 인식 오류: " + errorCode);
-        UpdateStatus("음성을 다시 말해주세요");
+
+        string errorMessage = GetErrorMessage(errorCode);
+        UpdateStatus("errorMessage");
         StopListening();
+    }
+    private string GetErrorMessage(string errorCode)
+    {
+        switch (errorCode)
+        {
+            case "ERROR_NETWORK_TIMEOUT":
+            case "ERROR_NETWORK":
+                return "네트워크 오류입니다. 인터넷 연결을 확인해주세요.";
+            case "ERROR_AUDIO":
+                return "오디오 오류입니다. 마이크를 확인해주세요.";
+            case "ERROR_SERVER":
+                return "서버 오류입니다. 잠시 후 다시 시도해주세요.";
+            case "ERROR_CLIENT":
+                return "클라이언트 오류입니다.";
+            case "ERROR_SPEECH_TIMEOUT":
+                return "음성을 감지하지 못했습니다. 다시 시도해주세요.";
+            case "ERROR_NO_MATCH":
+                return "음성을 인식하지 못했습니다. 더 명확하게 말해주세요.";
+            case "ERROR_RECOGNIZER_BUSY":
+                return "음성 인식기가 사용 중입니다. 잠시 후 다시 시도해주세요.";
+            case "ERROR_INSUFFICIENT_PERMISSIONS":
+                return "권한이 부족합니다. 마이크 권한을 확인해주세요.";
+            default:
+                return "음성을 다시 말해주세요.";
+        }
     }
 
     public void OnPartialResult(string partialResult)
@@ -450,29 +550,45 @@ public class UnitySpeechRecognition : MonoBehaviour
 
         public void onResults(AndroidJavaObject results)
         {
-            AndroidJavaObject arrayList = results.Call<AndroidJavaObject>("getStringArrayList", "results_recognition");
-            if (arrayList != null)
+            try
             {
-                int size = arrayList.Call<int>("size");
-                if (size > 0)
+                AndroidJavaObject arrayList = results.Call<AndroidJavaObject>("getStringArrayList", "results_recognition");
+                if (arrayList != null)
                 {
-                    string result = arrayList.Call<string>("get", 0);
-                    speechRecognition.OnSpeechRecognitionResult(result);
+                    int size = arrayList.Call<int>("size");
+                    if (size > 0)
+                    {
+                        string result = arrayList.Call<string>("get", 0);
+                        speechRecognition.OnSpeechRecognitionResult(result);
+                    }
                 }
             }
-        }
+            catch (System.Exception e)
+            {
+                Debug.LogError("onResults 처리 중 오류: " + e.Message);
+                speechRecognition.OnSpeechRecognitionError("RESULT_PROCESSING_ERROR");
+            }
+        }   
 
         public void onPartialResults(AndroidJavaObject partialResults)
         {
-            AndroidJavaObject arrayList = partialResults.Call<AndroidJavaObject>("getStringArrayList", "results_recognition");
-            if (arrayList != null)
+            try
             {
-                int size = arrayList.Call<int>("size");
-                if (size > 0)
+                AndroidJavaObject arrayList = partialResults.Call<AndroidJavaObject>("getStringArrayList", "results_recognition");
+                if (arrayList != null)
                 {
-                    string result = arrayList.Call<string>("get", 0);
-                    speechRecognition.OnPartialResult(result);
+                    int size = arrayList.Call<int>("size");
+                    if (size > 0)
+                    {
+                        string result = arrayList.Call<string>("get", 0);
+                        speechRecognition.OnPartialResult(result);
+                    }
                 }
+
+            }
+            catch (System.Exception e)
+            {
+            Debug.LogError("onPartialResults 처리 중 Error: " + e.Message);
             }
         }
 
