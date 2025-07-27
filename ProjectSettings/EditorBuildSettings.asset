@@ -5,10 +5,16 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
-    path: Assets/01_Scenes/MBTITestScene.unity
+  - enabled: 1
+    path: Assets/01_Scenes/01_IntroScene.unity
+    guid: 169b33115b24b2344be8f76689b2ed46
+  - enabled: 1
+    path: Assets/01_Scenes/MBTIScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
+    path: Assets/01_Scenes/ARScene.unity
+    guid: 5b1c44282d823064d8536b510959fe0c
+  - enabled: 0
     path: Assets/01_Scenes/VoiceTestScene.unity
     guid: fea1575e4350d9c47a17f08d56823099
   m_configObjects:

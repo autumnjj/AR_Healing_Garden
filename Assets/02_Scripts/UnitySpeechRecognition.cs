@@ -3,7 +3,6 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
-using static Unity.Android.Gradle.Manifest.Permission;
 
 #if UNITY_ANDROID
 using UnityEngine.Android;
@@ -31,7 +30,7 @@ public class UnitySpeechRecognition : MonoBehaviour
 
     // 상태
     private bool isListening = false;
-    private bool isinitialized = false;
+    private bool isInitialized = false;
     private string currentTarget = "";
     private int currentCount = 0;
     private int dailyTargetIndex = 0;
@@ -165,7 +164,7 @@ public class UnitySpeechRecognition : MonoBehaviour
                     speechCallback = new SpeechRecognitionCallback(this);
                     speechRecognizer.Call("setRecognitionListener", speechCallback);
 
-                    isinitialized = true;
+                    isInitialized = true;
                     UpdateStatus("음성 인식 준비 완료");
                     Debug.Log("Android 음성 인식 초기화 성공");
                 }
@@ -206,7 +205,7 @@ public class UnitySpeechRecognition : MonoBehaviour
 
     public void ToggleListening()
     {
-        if (!isinitialized)
+        if (!isInitialized)
         {
             UpdateStatus("음성 인식이 초기화되지 않았습니다.");
             return;
@@ -222,7 +221,7 @@ public class UnitySpeechRecognition : MonoBehaviour
     {
 #if UNITY_ANDROID
 
-        if (speechRecognizer == null || !isinitialized)
+        if (speechRecognizer == null || !isInitialized)
         {
             UpdateStatus("음성 인식기가 준비되지 않았습니다.");
             return;
