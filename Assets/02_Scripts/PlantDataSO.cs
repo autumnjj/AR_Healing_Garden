@@ -13,7 +13,6 @@ public class PlantDataSO : ScriptableObject
 
     [Header("MBIT 매칭")]
     public List<string> primaryMBTI = new List<string>();
-    public List<string> secondaryMBTI = new List<string>();
 
     [Header("식물 특성")]
     public string symolism;

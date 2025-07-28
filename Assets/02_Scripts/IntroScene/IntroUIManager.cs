@@ -16,6 +16,10 @@ public class IntroUIManager : MonoBehaviour
     public GameObject settingsPanel;
     public GameObject choicePanel;
 
+    [Header("하위 UI 컨트롤러들")]
+    public MBTIDropdownUI mbtiDropdownUI;
+    public ChoiceUIController choiceUIController;
+
     [Header("Setting UI")]
     public Button settingsButton;
     public Button settingsCloseButton;
@@ -23,13 +27,6 @@ public class IntroUIManager : MonoBehaviour
 
     [Header("대화 UI")]
     public TextMeshProUGUI dialogueText;
-
-    [Header("Choice UI")]
-    public TextMeshProUGUI choiceTitle;
-    public TextMeshProUGUI choiceDescription;
-    public Button mbtiButton;
-    public Button arButton;
-    public Button choiceCloseButton;
 
     [Header("컨트롤 Buttons")]
     public Button SkipButton;
@@ -54,8 +51,28 @@ public class IntroUIManager : MonoBehaviour
         // 볼륨 초기화
         InitializeVolume();
 
-        // 선택 패널 텍스트 설정
-        SetupChoicePanel();
+        HideAllPanles();
+
+        // 하위 컨트롤러들 초기화
+        SetupSubControllers();
+    }
+
+    private void SetupSubControllers()
+    {
+        // Choice UI Controller 이벤트 연결
+        if (choiceUIController != null)
+        {
+            choiceUIController.OnDirectInputSelected += () => mbtiDropdownUI.ShowPanel();
+            choiceUIController.OnQuickTestSelected += GoToMBTI;
+            choiceUIController.OnQuickStartSelected += GoToAR;
+        }
+
+        // MBTI Dropdown UI 이벤트 연결
+        if (mbtiDropdownUI != null)
+        {
+            mbtiDropdownUI.OnMBTIConfirmed += OnMBTIConfirmed;
+            mbtiDropdownUI.OnCancelled += () => ShowChoicePanel();
+        }
     }
 
     private void HideAllPanles()
@@ -63,52 +80,45 @@ public class IntroUIManager : MonoBehaviour
         if (dialoguePanel != null) dialoguePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
         if (choicePanel != null) choicePanel.SetActive(false);
-
     }
 
-    private void ConnectButtonEvents()
+    #region 하위 컨트롤러 이벤트 처리
+    private void OnMBTIConfirmed(string mbtiCode)
     {
-        // Setting 관련
-        if (settingsButton != null)
-            settingsButton.onClick.AddListener(ToggleSettings);
-        if (settingsCloseButton != null)
-            settingsCloseButton.onClick.AddListener(CloseSettings);
+        Debug.Log($"MBTI Confired: {mbtiCode}");
 
-        // 선택 관련
-        if (mbtiButton != null)
-            mbtiButton.onClick.AddListener(GoToMBTI);
-        if (arButton != null)
-            arButton.onClick.AddListener(GoToAR);
-        if (choiceCloseButton != null)
-            choiceCloseButton.onClick.AddListener(CloseChoicePanel);
+        // 데이터 저장
+        PlayerPrefs.SetString("MBTI_Type", mbtiCode);
+        PlayerPrefs.SetString("InputMethod", "DirectInput");
+        PlayerPrefs.Save();
 
-        // 컨트롤 관련
-        if (SkipButton != null)
-            SkipButton.onClick.AddListener(SkipIntro);
-        if (QuitButton != null)
-            QuitButton.onClick.AddListener(QuitApp);
-
-        if (volumeSlider != null)
-            volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
+        // AR 씬으로 이동
+        StartCoroutine(LoadSceneWithDelay("ARScene", 0.5f));
     }
 
-    private void InitializeVolume()
+    private void GoToMBTI()
     {
-        float savedVolume = PlayerPrefs.GetFloat("AppVolume", 0.8f);
-        if (volumeSlider != null)
-            volumeSlider.value = savedVolume;
-        AudioListener.volume = savedVolume;
+        Debug.Log("Load MBTI Scene...");
+        PlayerPrefs.SetString("InputMethod", "QuickTest");
+        PlayerPrefs.Save();
+        StartCoroutine(LoadSceneWithDelay("MBTIScene", 0.5f));
     }
 
-    private void SetupChoicePanel()
+    private void GoToAR()
     {
-        if (choiceTitle != null)
-            choiceTitle.text = "";
+        Debug.Log("Load AR Scene...");
 
-        if (choiceDescription != null)
-            choiceDescription.text = "";
+        // 기본 식물 설정
+        PlayerPrefs.SetString("InputMethod", "QuickTest");
+        PlayerPrefs.SetString("MBTI_Type", "ENFP");
+        PlayerPrefs.SetString("Matched_Plant", "default_plant");
+        PlayerPrefs.Save();
+
+        StartCoroutine(LoadSceneWithDelay("ARScene", 0.5f));
     }
+    #endregion
 
+    #region Intro Sequence
     private void ConnectEvents()
     {
         // 대화 이벤트
@@ -134,7 +144,6 @@ public class IntroUIManager : MonoBehaviour
             inputHandler.OnSparrowTouched += OnSparrowInteraction;
     }
 
-    #region Intro Sequence
     private void StartIntroSequence()
     {
         Debug.Log("Ready For AR Environment");
@@ -152,10 +161,7 @@ public class IntroUIManager : MonoBehaviour
         }
     }
 
-    private void OnSparrowSpawned()
-    {
-        Debug.Log("Show Sparrow");
-    }
+    private void OnSparrowSpawned() => Debug.Log("Show Sparrow");
 
     private void OnSparrowReady()
     {
@@ -183,32 +189,21 @@ public class IntroUIManager : MonoBehaviour
         }
     }
 
-    private void OnSparrowTouched()
-    {
-        Debug.Log("Sparrow happy");
-    }
+    private void OnSparrowTouched() => Debug.Log("Sparrow happy");
     #endregion
 
     #region UI Panel 관리
     private void ShowDialoguePanel()
     {
-        if (dialoguePanel != null)
-            dialoguePanel.SetActive(true);
+        if (dialoguePanel != null) dialoguePanel.SetActive(true);
 
         Debug.Log("Conversation Start!");
-    }
-
-    private void HideDialoguePanel()
-    {
-        if (dialoguePanel != null)
-            dialoguePanel.SetActive(false);
     }
 
     private void OnIntroComplete()
     {
         introComplete = true;
-
-        HideDialoguePanel();
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
         ShowChoicePanel();
 
         Debug.Log("Intro Done. Show ChoicePanel");
@@ -216,32 +211,40 @@ public class IntroUIManager : MonoBehaviour
 
     private void ShowChoicePanel()
     {
-        if (choicePanel != null)
-            choicePanel.SetActive(true);
-    }
-
-    private void CloseChoicePanel()
-    {
-        if (choicePanel != null)
-            choicePanel.SetActive(false);
+        if (choicePanel != null) choicePanel.SetActive(true);
     }
     #endregion
 
-    #region Setting 관리
-    private void OpenSettings()
+    #region Settings & Controls
+    private void ConnectButtonEvents()
     {
-        if (settingsPanel != null)
-            settingsPanel.SetActive(true);
+        // Setting 관련
+        if (settingsButton != null)
+            settingsButton.onClick.AddListener(ToggleSettings);
+        if (settingsCloseButton != null)
+            settingsCloseButton.onClick.AddListener(() => settingsPanel.SetActive(false));
 
-        Debug.Log("Open Settings Panel");
+        // 컨트롤 관련
+        if (SkipButton != null)
+            SkipButton.onClick.AddListener(SkipIntro);
+        if (QuitButton != null)
+            QuitButton.onClick.AddListener(() => Application.Quit());
+
+        if (volumeSlider != null)
+            volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
     }
 
-    private void CloseSettings()
+    private void InitializeVolume()
+    {
+        float savedVolume = PlayerPrefs.GetFloat("AppVolume", 0.8f);
+        if (volumeSlider != null)
+            volumeSlider.value = savedVolume;
+        AudioListener.volume = savedVolume;
+    }
+    private void ToggleSettings()
     {
         if (settingsPanel != null)
-            settingsPanel.SetActive(false);
-
-        Debug.Log("Close Settings Panel");
+            settingsPanel.SetActive(!settingsPanel.activeSelf);
     }
 
     private void OnVolumeChanged(float value)
@@ -254,35 +257,7 @@ public class IntroUIManager : MonoBehaviour
 
         Debug.Log($"Change Volume : {value * 100:F0}%");
     }
-    #endregion
 
-    #region Scene Change
-    private void GoToMBTI()
-    {
-        Debug.Log("Load MBTI Scene...");
-        StartCoroutine(LoadSceneWithDelay("MBTIScene", 0.5f));
-    }
-
-    private void GoToAR()
-    {
-        Debug.Log("Load AR Scene...");
-
-        // 기본 식물 설정
-        PlayerPrefs.SetString("DirectStart", "true");
-        PlayerPrefs.SetString("Matched_Plant", "default_plant");
-        PlayerPrefs.Save();
-
-        StartCoroutine(LoadSceneWithDelay("ARScene", 0.5f));
-    }
-
-    private IEnumerator LoadSceneWithDelay(string sceneName, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        SceneManager.LoadScene(sceneName);
-    }
-    #endregion
-
-    #region 컨트롤 Buttons
     private void SkipIntro()
     {
         Debug.Log("Skip Intro");
@@ -297,18 +272,11 @@ public class IntroUIManager : MonoBehaviour
         }
     }
 
-    private void QuitApp()
+    private IEnumerator LoadSceneWithDelay(string sceneName, float delay)
     {
-        Debug.Log("Quit App");
-
-        Application.Quit();
+        yield return new WaitForSeconds(delay);
+        SceneManager.LoadScene(sceneName);
     }
     #endregion
-
-    private void ToggleSettings()
-    {
-        if (settingsPanel != null)
-            settingsPanel.SetActive(!settingsPanel.activeSelf);
-    }
 
 }

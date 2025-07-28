@@ -95,16 +95,18 @@ public class MBTIManager : MonoBehaviour
             Debug.LogError("questionsData is null. Did not load in Resources Folder");
             return;
         }
+
+        if (questionsData.questions == null || questionsData.questions.Count == 0)
+        {
+            Debug.LogError("Question Data is empty");
+            return;
+        } 
         currentQuestionIndex = 0;
         InitializeScores();
+
         ShowCurrentQuestion();
     }
 
-    public void RestartTest()
-    {
-        userData.ClearData();
-        StartTest();
-    }
 
     private void ShowCurrentQuestion()
     {
@@ -121,8 +123,8 @@ public class MBTIManager : MonoBehaviour
         var question = questionsData.questions[currentQuestionIndex];
         float scoreValue = (optionIndex == 0) ? question.optionAValue : question.optionBValue;
 
-        Debug.Log($"질문 {currentQuestionIndex} : {question.questionText}");
-        Debug.Log($"선택 : {optionIndex}, 차원 : {question.dimension}, 점수 : {scoreValue}");
+        Debug.Log($"Question {currentQuestionIndex} : {question.questionText}");
+        Debug.Log($"Selected : {optionIndex}, 차원 : {question.dimension}, Score : {scoreValue}");
 
         // Dictionary 키 확인
         if(currentScores == null)
@@ -131,31 +133,19 @@ public class MBTIManager : MonoBehaviour
             InitializeScores();
         }
 
-        // 점수 추가
-        if (question.dimension == "Mixed_TF")
+        if (currentScores.ContainsKey(question.dimension))
         {
-            // 복합 질문 처리
-            if (currentScores.ContainsKey("TF")) currentScores["TF"] += scoreValue * 0.5f;
+            currentScores[question.dimension] += scoreValue;
         }
-        else if (question.dimension == "Mixed_SN")
+        else
         {
-            if (currentScores.ContainsKey("SN")) currentScores["SN"] += scoreValue * 0.5f;
-        }
-        else 
-        {
-            if (currentScores.ContainsKey(question.dimension))
-            {
-                currentScores[question.dimension] += scoreValue;
-            }
-            else
-            {
-                Debug.LogError($"키 '{question.dimension}'가 Dictionary에 없습니다!");
-                Debug.LogError($"현재 키들 : {string.Join(", ", currentScores.Keys)}");
-                return;
-            }
+            Debug.LogError($"키 '{question.dimension}'가 Dictionary에 없습니다.");
+            return;
         }
 
         currentQuestionIndex++;
+
+        Debug.Log($"Now Question Index : {currentQuestionIndex}, Total question count: {questionsData.questions.Count}");
 
         // 다음 질문 또는 결과 계산
         if(currentQuestionIndex >= questionsData.questions.Count)
@@ -177,6 +167,8 @@ public class MBTIManager : MonoBehaviour
         mbtiType += (currentScores["TF"] > 0) ? "T" : "F";
         mbtiType += (currentScores["JP"] > 0) ? "J" : "P";
 
+        Debug.Log($"Calculate MBTI: {mbtiType}");
+
         // 사용자 데이터 저장
         userData.mbtiType = mbtiType;
         userData.EI_score = currentScores["EI"];
@@ -186,6 +178,11 @@ public class MBTIManager : MonoBehaviour
 
         // 식물 매칭
         PlantDataSO matchedPlant = FindBestMatchingPlant(mbtiType);
+        if (matchedPlant == null)
+        {
+            Debug.LogError("There is no matching plants");
+            return;
+        }
         userData.matchedPlantId = matchedPlant.plantId;
 
         // PlayerPrefs에 저장
@@ -199,6 +196,45 @@ public class MBTIManager : MonoBehaviour
 
     PlantDataSO FindBestMatchingPlant(string mbtiType)
     {
+       if (plantDatabase.Count == 0)
+        {
+            Debug.LogError("PlantDatabase is empty");
+            return null;
+        }
+
+        // 4개 식물로 단순화된 매칭
+        Dictionary<string, string> mbtiToPlantId = new Dictionary<string, string>
+       {
+           // 해바라기 그룹(외향적, 활발한)
+           {"ENFP", "Sunflower" }, {"ENFJ", "Sunflower" }, {"ESFP", "Sunflower" }, {"ESFJ", "Sunflower" },
+
+           // 선인장 그룹(독립적, 강인한)
+           {"INTJ", "cactus" }, {"INTP", "cactus" }, {"ENTJ", "cactus" }, {"ENTP", "cactus" },
+
+           // 라벤더 그룹(조용한, 섬세한)
+           {"ISFP", "lavender" },{"INFP", "lavender" },{"ISFJ", "lavender" },{"INFJ", "lavender" },
+
+           // 장미 그룹(체계적, 실용적)
+           {"ESTJ", "rose" }, {"ESTP", "rose" }, {"ISTJ", "rose" }, {"ISTP", "rose" }
+       };
+
+        // 매칭도닌 식물 ID 찾기
+        string targetPlantId = mbtiToPlantId.ContainsKey(mbtiType) ? mbtiToPlantId[mbtiType] : "sunflower";
+
+        // PlantDatabase에서 해당 ID의 식물 찾기
+        foreach(var plant in plantDatabase)
+        {
+            if (plant.plantId == targetPlantId)
+            {
+                Debug.Log($"MBTI {mbtiType}에 매칭된 식물: {plant.koreanName}");
+                return plant;
+            }
+        }
+
+        // 못찾으면 첫번째 식물 반환
+        Debug.LogWarning($"Cant not find Plant ID '{targetPlantId}' use basic plant");
+        return plantDatabase[0];
+        /*
         if (plantDatabase.Count == 0)
         {
             Debug.LogError("PlantDatabase is empty");
@@ -240,6 +276,7 @@ public class MBTIManager : MonoBehaviour
             }
         }
         return bestMatch;
+        */
     }
 
     int CalculateSimilarity(string type1, string type2)

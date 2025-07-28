@@ -127,6 +127,8 @@ public class PlantGrowthData : MonoBehaviour
 
     private void SetupDefaultGrowthStages()
     {
+        if (plantData == null) return;
+
         growthStages = new List<PlantGrowthStageData>
         {
             new PlantGrowthStageData
