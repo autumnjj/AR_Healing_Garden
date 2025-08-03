@@ -95,20 +95,22 @@ public class ARInputHandler : MonoBehaviour
     {
         Debug.Log($"Tap detected at : {screenPosition}");
 
-        // 참새 터치 확인
+        /* 참새 터치 확인
         if (IsSparrowTouch(screenPosition))
         {
             OnSparrowTouched?.Invoke(screenPosition);
         }
+        */
     }
-
+    /*
     private bool IsSparrowTouch(Vector2 screenPosition)
     {
+        
         // SparrowController에서 참새 위치 확인
-        var sparrowController = FindAnyObjectByType<SparrowController>();
-        if (sparrowController == null || !sparrowController.IsActive()) return false;
+        //var sparrowController = FindAnyObjectByType<SparrowController>();
+       // if (sparrowController == null || !sparrowController.IsActive()) return false;
 
-        Vector3 sparrowWorldPos = sparrowController.GetSparrowPosition();
+        //Vector3 sparrowWorldPos = sparrowController.GetSparrowPosition();
         if(sparrowWorldPos == Vector3.zero) return false;
 
         Vector3 sparrowScreenPos = arCamera.WorldToScreenPoint(sparrowWorldPos);
@@ -119,7 +121,9 @@ public class ARInputHandler : MonoBehaviour
 
         // 터치 허용 반경
         return distance <= 100f;
+        
     }
+    */
 
     private Vector2 GetTouchPosition()
     {

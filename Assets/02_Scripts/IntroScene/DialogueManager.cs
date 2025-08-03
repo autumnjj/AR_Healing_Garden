@@ -12,12 +12,12 @@ public class DialogueLine
     [Header("타이밍 설정")]
     public float startDelay = 0f;
     public float typingSpeed = 0.04f;
-    public bool waitForAudioComplete = true;
-    public float pauseAfter = 1f;
+    public float textCompletionRatio = 0.7f;
+    public float pauseAfter = 0.8f;
 
     [Header("고급 설정")]
     public float audioStartOffset = 0f;
-    public float textCompletionRatio = 0.7f;
+    public bool waitForAudioComplete = true;
 }
 public class DialogueManager : MonoBehaviour
 {
@@ -35,6 +35,7 @@ public class DialogueManager : MonoBehaviour
     private bool isPlaying = false;
     private bool isTyping = false;
     private bool isAudioPlaying = false;
+
     private Coroutine dialogueCoroutine;
     private Coroutine typingCoroutine;
     private Coroutine audioCoroutine;
@@ -45,6 +46,7 @@ public class DialogueManager : MonoBehaviour
     public System.Action<string> OnLineStart;
     public System.Action<int> OnLineComplete;
     public System.Action<int> OnAudioComplete;
+
     private void Start()
     {
         SetupDialogue();
@@ -70,7 +72,7 @@ public class DialogueManager : MonoBehaviour
         {
             new DialogueLine
             {
-                text = "안녕하세요!\n 저는 Blee예요. BloomSpeak 가이드 친구랍니다!",
+                text = "안녕하세요!\n 저는 Blee예요.\nBloomSpeak 가이드 친구랍니다!",
                 voiceClip = line1Audio,
                 startDelay = 0.2f,
                 textCompletionRatio = 0.75f,
@@ -80,7 +82,7 @@ public class DialogueManager : MonoBehaviour
             },
             new DialogueLine
             {
-                text = "여기서는 AR로 나만의 작은 치유 공간을 만들고, 따뜻한 말 한마디로 식물과 함께 성장할 수 있어요!",
+                text = "AR로 나만의특별한 식물 친구를 키울 수 있어요!\n 긍정적인 자기대화 습관을 자연스럽게 만들어가요.",
                 voiceClip = line2Audio,
                 startDelay = 0.1f,
                 textCompletionRatio = 0.8f,
@@ -90,7 +92,7 @@ public class DialogueManager : MonoBehaviour
             },
             new DialogueLine
             {
-                text = "3가지 방법으로 BloomSpeak를 즐길 수 있어요",
+                text = "이제 시작해볼까요?\n원하는 방법을 골라보세요!",
                 voiceClip = line3Audio,
                 startDelay = 0.1f,
                 textCompletionRatio = 0.85f,
@@ -110,17 +112,15 @@ public class DialogueManager : MonoBehaviour
 
     public void StartDialogue()
     {
-        if (isPlaying) 
-        {
-            SkipToEnd();
-            return;
-        }
+        if (isPlaying) return;
 
         isPlaying = true;
         currentLineIndex = 0;
 
         OnDialogueStart?.Invoke();
         dialogueCoroutine = StartCoroutine(PlayDialogueSequence());
+
+        Debug.Log("Dialogue Started");
     }
 
     private IEnumerator PlayDialogueSequence()
@@ -129,6 +129,8 @@ public class DialogueManager : MonoBehaviour
         {
             currentLineIndex = i;
             var line = dialogueLines[i];
+
+            Debug.Log($"Playing Line {i + 1}/{dialogueLines.Length}");
 
             // 참새 애니메이션 트리거
             OnLineStart?.Invoke(GetEmotionFromText(line.text));
@@ -213,7 +215,7 @@ public class DialogueManager : MonoBehaviour
         }
         else
         {
-            targetDuration = line.text.Length * 0.05f;
+            targetDuration = line.text.Length * 0.04f;
         }
 
         float actualTypingSpeed = targetDuration / line.text.Length;
@@ -233,8 +235,8 @@ public class DialogueManager : MonoBehaviour
     private string GetEmotionFromText(string text)
     {
         if (text.Contains("안녕")) return "greeting";
-        if (text.Contains("마법")) return "excited";
-        if (text.Contains("터치") || text.Contains("상호작용")) return "curious";
+        if (text.Contains("함께") || text.Contains("성장")) return "excited";
+        if (text.Contains("치유") || text.Contains("마음")) return "curious";
         return "happy";
     }
 
@@ -247,21 +249,6 @@ public class DialogueManager : MonoBehaviour
         OnDialogueComplete?.Invoke();
     }
 
-    public void SkipToEnd()
-    {
-        if (dialogueCoroutine != null) StopCoroutine(dialogueCoroutine);
-        if (typingCoroutine != null) StopCoroutine(typingCoroutine);
-        if(audioCoroutine != null) StopCoroutine(audioCoroutine);
-
-        // 음성 정지
-        if (voiceAudioSource != null && voiceAudioSource.isPlaying)
-            voiceAudioSource.Stop();
-
-        if (dialogueLines.Length > 0 && dialogueText != null)
-            dialogueText.text = dialogueLines[dialogueLines.Length - 1].text;
-
-        CompleteDialogue();
-    }
 
     // 공개 메서드들
     public bool IsPlaying() => isPlaying;

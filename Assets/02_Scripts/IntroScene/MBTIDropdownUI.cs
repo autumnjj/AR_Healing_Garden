@@ -14,6 +14,9 @@ public class MBTIDropdownUI : MonoBehaviour
     public Button cancelButton;
     public TextMeshProUGUI titleText;
 
+    [Header("Font")]
+    public TMP_FontAsset koreanFont;
+
     // 이벤트
     public System.Action<string> OnMBTIConfirmed;
     public System.Action OnCancelled;
@@ -63,7 +66,7 @@ public class MBTIDropdownUI : MonoBehaviour
         mbtiDropdown.RefreshShownValue();
 
         // 드롭다운 스타일 설정
-        SetupDropdownStyle();
+        //SetupDropdownStyle();
     }
 
     private void SetupDropdownStyle()
