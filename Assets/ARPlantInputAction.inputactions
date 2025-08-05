@@ -1,0 +1,74 @@
+{
+    "name": "ARPlantInputAction",
+    "maps": [
+        {
+            "name": "AR Plant",
+            "id": "a847dced-1afe-415b-9bb2-72e0273ddda3",
+            "actions": [
+                {
+                    "name": "Touch",
+                    "type": "Button",
+                    "id": "99cabdd7-d041-4635-9ce2-8888ffbdeee8",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "TouchPosition",
+                    "type": "Value",
+                    "id": "fa4b7a22-75c0-457d-890b-d3bfb6be7d2d",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Pinch",
+                    "type": "Value",
+                    "id": "a5ead5c7-07c8-43bb-b1c3-4cb318600df0",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "19b6132f-4b85-4a15-a821-73f7703cf396",
+                    "path": "<Touchscreen>/Press",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Touch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a83e9fd8-1e41-40fc-9f6f-2c6ec3ce2ac6",
+                    "path": "<Touchscreen>/primaryTouch/position",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "TouchPosition",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2ae6bdf8-aec8-4116-b8ee-13a98cda08e1",
+                    "path": "<Touchscreen>/touch*/Press",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Pinch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}

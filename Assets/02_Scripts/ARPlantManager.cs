@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using System.Collections.Generic;
+using UnityEngine.InputSystem;
 using TMPro;
 
 public class ARPlantManager : MonoBehaviour
@@ -12,125 +13,125 @@ public class ARPlantManager : MonoBehaviour
     public Camera arCamera;
 
     [Header("Plant Prefabs")]
-    public GameObject plantPrefab;
-    public Transform plantParent;
+    public GameObject tablePrefab;
+    public GameObject seedPrefab;
 
-    [Header("Plant Growth System")]
-    public PlantGrowthData plantGrowthData;
-    public PlantGrowthUI plantGrowthUI;
+    [Header("Plant Prefabs by Type")]
+    public PlantPrefabSet sunflowerPrefabs;
+    public PlantPrefabSet rosePrefabs;
+    public PlantPrefabSet cactusPrefabs;
+    public PlantPrefabSet lavenderPrefabs;
 
-    [Header("UI Elements")]
+    [Header("UI")]
     public GameObject placementIndicator;
-    public GameObject instructionUI;
+    public TextMeshProUGUI instructionText;
+    public TextMeshProUGUI statusText;
 
-    [Header("Input System")]
-    public ARInputManager inputManager;
+    [Header("Input Actions")]
+    public InputActionAsset inputActions;
+
+    // Input Actions
+    private InputAction touchAction;
+    private InputAction touchPositionAction;
+    private InputAction pinchAction;
 
     // AR 관련 변수
     private List<ARRaycastHit> raycastHits = new List<ARRaycastHit>();
+    private GameObject tableInstance;
     private GameObject currentPlantInstance;
+    private bool isTablePlaced = false;
     private bool isPlantPlaced = false;
-    private Pose placementPose;
-    private bool placementPoseIsValid = false;
 
-    // 평면 감지 체크용
-    private int lastPlaneCount = 0;
+    // 식물 관련
+    private PlantGrowthStage currentGrowthStage = PlantGrowthStage.Seed;
+    private string selectedPlantType = "sunflower";
+    private float growthPoints = 0f;
+    private float maxGrowthPoints = 100f;
+
+    // 상태
+    private bool isPlacementMode = true;
+    private Vector3 lastTouchPosition;
+    private float lastTouchTime;
+
+    [System.Serializable]
+    public class PlantPrefabSet
+    {
+        public GameObject sprout;
+        public GameObject growing;
+        public GameObject blooming;
+    }
 
     private void Start()
     {
+        SetupInputActions();
         InitializeAR();
-        SetupInputManager();
+        LoadSelectedPlant();
+        UpdateInstructionText("화면을 터치해서 화분을 놓아보세요!");
+    }
+
+    private void SetupInputActions()
+    {
+        if (inputActions == null) return;
+
+        var actionMap = inputActions.FindActionMap("AR Plant");
+        touchAction = actionMap.FindAction("Touch");
+        touchPositionAction = actionMap.FindAction("TouchPosition");
+        pinchAction = actionMap.FindAction("Pinch");
+    }
+
+    private void OnEnable()
+    {
+        if (touchAction != null)
+        {
+            touchAction.started += OnTouchStarted;
+            touchAction.canceled += OnTouchEnded;
+        }
+
+        touchAction?.Enable();
+        touchPositionAction?.Enable();
+        pinchAction?.Enable();
+    }
+
+    private void OnDisable()
+    {
+        if (touchAction != null)
+        {
+            touchAction.started -= OnTouchStarted;
+            touchAction.canceled -= OnTouchEnded;
+        }
+
+        touchAction?.Disable();
+        touchPositionAction?.Disable();
+        pinchAction?.Disable();
     }
 
     private void InitializeAR()
-    {
-        if (planeManager != null)
-        {
-            planeManager.enabled = true;
-        }
-
+    { 
         if(placementIndicator != null)
-        {
             placementIndicator.SetActive(false);
-        }
-
-        ShowInstructionUI("바닥을 스캔하여 식물을 배치할 공간을 찾아보세요");
     }
 
-    private void SetupInputManager()
+    private void LoadSelectedPlant()
     {
-        if (inputManager != null) 
-        {
-            inputManager.plantManager = this;
-
-            // 식물 레이어 설정
-            inputManager.SetPlantLayerMask(1 << 8);
-        }
+        // MBTI 결과에서 식물 타입 가져오기
+        selectedPlantType = PlayerPrefs.GetString("Matched_Plant", "sunflower").ToLower();
+        Debug.Log($"Selected plant type : {selectedPlantType}");
     }
 
     private void Update()
     {
-        if (!isPlantPlaced)
-        {
-            UpdatePlacementPose();
+        if (isPlacementMode)
             UpdatePlacementIndicator();
-            CheckForNewPlanes();
-        }
-    }
 
-    private void CheckForNewPlanes()
-    {
-        if(planeManager != null)
-        {
-            int currentPlaneCount = planeManager.trackables.count;
-
-            // 새로운 평면이 감지되었을 때
-            if(currentPlaneCount > lastPlaneCount && !isPlantPlaced)
-            {
-                ShowInstructionUI("평면을 감지했습니다. 화면을 터치하여 식물을 배치하세요!");
-                Debug.Log($"New Plane indicator. Total Plane Count : {currentPlaneCount}");
-            }
-
-            lastPlaneCount = currentPlaneCount;
-        }
-    }
-
-    private void UpdatePlacementPose()
-    {
-        var screenCenter = arCamera.ViewportToScreenPoint(new Vector3(0.5f, 0.5f));
-        raycastHits.Clear();
-
-        if (raycastManager.Raycast(screenCenter, raycastHits, TrackableType.PlaneWithinPolygon))
-        {
-            placementPoseIsValid = true;
-            placementPose = raycastHits[0].pose;
-
-            var hitPlane = raycastHits[0].trackable as ARPlane;
-            if (hitPlane != null && hitPlane.alignment == PlaneAlignment.HorizontalUp)
-            {
-                placementPose = raycastHits[0].pose;
-            }
-        }
-        else
-        {
-            placementPoseIsValid = false;
-        }
+        HandlePinchForScale();
     }
 
     private void UpdatePlacementIndicator()
     {
-        if (placementIndicator != null)
-        {
-            if (placementPoseIsValid && !isPlantPlaced) 
-            {
-                placementIndicator.SetActive(true);
-                placementIndicator.transform.SetPositionAndRotation(placementPose.position, placementPose.rotation);
-            }
-            else
-            {
-                placementIndicator.SetActive(false);
-            }
-        }
+        var screenCenter = arCamera.ViewportToScreenPoint(new Vector3(0.5f, 0.5f));
+        raycastHits.Clear();
+
+        
     }
 
     public void PlacePlantAtPosition(Pose pose)

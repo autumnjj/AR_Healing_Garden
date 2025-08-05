@@ -474,6 +474,11 @@ public class UnitySpeechRecognition : MonoBehaviour
         }
     }
 
+    public bool IsListening()
+    {
+        return isListening;
+    }
+
     // 수동 완료(테스트용)
     public void ManualComplete()
     {
