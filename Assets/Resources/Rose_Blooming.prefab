@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &5189575578498847621
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_Name
+      value: Rose_Blooming
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      propertyPath: m_TagString
+      value: Plant
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7639545507191170581}
+  m_SourcePrefab: {fileID: 100100000, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+--- !u!1 &4955220385801596628 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 09c3c03543198f8468218cac74a9d44e, type: 3}
+  m_PrefabInstance: {fileID: 5189575578498847621}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &7639545507191170581
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4955220385801596628}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cfcc39a1c2fb2dc4389a79eadfab6c9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  prefabDefaultRotation: {x: 90, y: 0, z: 0}
+  applyRotationCorrection: 1
+  inputActions: {fileID: -944628639613478452, guid: 59c4b0ea7fa236e468928263da913ba6, type: 3}
+  dragSpeed: 0.5

@@ -757,7 +757,7 @@ GameObject:
   - component: {fileID: 107390180510965456}
   m_Layer: 0
   m_Name: Sparrow
-  m_TagString: Untagged
+  m_TagString: Character
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -770,7 +770,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9111735005902936698}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: -0.99254614, z: 0, w: 0.12186937}
   m_LocalPosition: {x: -0.27012, y: 0, z: -0.29671}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -781,7 +781,7 @@ Transform:
   - {fileID: 8154579112066941420}
   - {fileID: 7257781700659782966}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -166, z: 0}
 --- !u!205 &8627740687249749302
 LODGroup:
   m_ObjectHideFlags: 0

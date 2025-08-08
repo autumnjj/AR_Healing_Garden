@@ -24,10 +24,10 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "Pinch",
+                    "name": "TouchDelta",
                     "type": "Value",
-                    "id": "a5ead5c7-07c8-43bb-b1c3-4cb318600df0",
-                    "expectedControlType": "Axis",
+                    "id": "031a0968-2b9d-4c11-b31f-e93bfe343f8d",
+                    "expectedControlType": "Vector2",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
@@ -58,12 +58,12 @@
                 },
                 {
                     "name": "",
-                    "id": "2ae6bdf8-aec8-4116-b8ee-13a98cda08e1",
-                    "path": "<Touchscreen>/touch*/Press",
+                    "id": "34f80a82-34c2-469d-ba65-633ff9fa5834",
+                    "path": "<Touchscreen>/primaryTouch/delta",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Pinch",
+                    "action": "TouchDelta",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

@@ -12,13 +12,15 @@ public class UserPersonalityData
     // PlayerPrefs에 저장
     public void SaveToPlayerPrefs()
     {
-        PlayerPrefs.SetString("MBTIType", mbtiType);
+        PlayerPrefs.SetString("MBTI_Type", mbtiType);
         PlayerPrefs.SetFloat("MBTI_EI", EI_score);
         PlayerPrefs.SetFloat("MBTI_SN", SN_score);
         PlayerPrefs.SetFloat("MBTI_TF", TF_score);
         PlayerPrefs.SetFloat("MBTI_JP", JP_score);
         PlayerPrefs.SetString("Matched_Plant", matchedPlantId);
         PlayerPrefs.Save();
+
+        Debug.Log($"Saved MBTI data: {mbtiType}, Plant:{matchedPlantId}");
     }
 
     // PlayerPrefs에서 로드
@@ -30,6 +32,8 @@ public class UserPersonalityData
         TF_score = PlayerPrefs.GetFloat("MBTI_TF", 0f);
         JP_score = PlayerPrefs.GetFloat("MBTI_JP", 0f);
         matchedPlantId = PlayerPrefs.GetString("Matched_Plant", "");
+
+        Debug.Log($"Saved MBTI data: {mbtiType}, Plant:{matchedPlantId}");
     }
 
     // 데이터가 있는지 확인
@@ -48,5 +52,15 @@ public class UserPersonalityData
         PlayerPrefs.DeleteKey("MBTI_JP");
         PlayerPrefs.DeleteKey("Matched_Plant");
         PlayerPrefs.Save();
+
+        // 변수도 초기화
+        mbtiType = "";
+        EI_score = 0f;
+        SN_score = 0f;
+        TF_score = 0f;
+        JP_score = 0f;
+        matchedPlantId = "";
+
+        Debug.Log("User personality data cleared");
     }
 }

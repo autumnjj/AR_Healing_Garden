@@ -1,410 +1,475 @@
 using UnityEngine;
-using UnityEngine.XR.ARFoundation;
-using UnityEngine.XR.ARSubsystems;
-using System.Collections.Generic;
-using UnityEngine.InputSystem;
 using TMPro;
+using UnityEngine.UI;
+using System.Collections;
 
 public class ARPlantManager : MonoBehaviour
 {
     [Header("AR Foundation Components")]
-    public ARRaycastManager raycastManager;
-    public ARPlaneManager planeManager;
     public Camera arCamera;
     
-    [Header("Plant Prefabs")]
-    public GameObject tablePrefab;
-    public GameObject seedPrefab;
+    [Header("Pre-placed Prefabs")]
+    public GameObject preplacedTable;
+    public Transform plantSpawnPoint;
+    public GameObject preplacedSeed;
 
-    [Header("Plant Prefabs by Type")]
-    public PlantPrefabSet sunflowerPrefabs;
-    public PlantPrefabSet rosePrefabs;
-    public PlantPrefabSet cactusPrefabs;
-    public PlantPrefabSet lavenderPrefabs;
+    [Header("Sunflower Prefabs")]
+    public GameObject sunflowerSprout;
+    public GameObject sunflowerGrowing;
+    public GameObject sunflowerBlooming;
+
+    [Header("Rose Prefabs")]
+    public GameObject roseSprout;
+    public GameObject roseGrowing;
+    public GameObject roseBlooming;
+
+    [Header("Cactus Prefabs")]
+    public GameObject cactusSprout;
+    public GameObject cactusGrowing;
+    public GameObject cactusBlooming;
+
+    [Header("Lavender Prefabs")]
+    public GameObject lavenderSprout;
+    public GameObject lavenderGrowing;
+    public GameObject lavenderBlooming;
 
     [Header("UI")]
-    public GameObject placementIndicator;
     public TextMeshProUGUI instructionText;
-    public TextMeshProUGUI statusText;
+    public GameObject voiceUI;
 
-    [Header("Input Actions")]
-    public InputActionAsset inputActions;
+    [Header("Voice Recognition")]
+    public ARPlantVoiceController voiceController;
 
-    // Input Actions
-    private InputAction touchAction;
-    private InputAction touchPositionAction;
-    private InputAction pinchAction;
+    [Header("Visual Effects")]
+    public ParticleSystem growthParticles;
+    public ParticleSystem successParticles;
 
-    // AR 관련 변수
-    private List<ARRaycastHit> raycastHits = new List<ARRaycastHit>();
+    [Header("Growth Settings")]
+    [Range(50f, 200f)]
+    public float maxGrowthPoints = 100f;
+    public float pointsPerVoiceSuccess = 15f;
+
+    [Header("Growth Thresholds")]
+    public float sproutThreshold = 45f;
+    public float growingThreshold = 90f;
+    public float bloomingThreshold = 100f;
+
+    [Header("Setup Settings")]
+    public float initialSetupDelay = 1.0f;
+    
+    // 오브젝트
     private GameObject tableInstance;
     private GameObject currentPlantInstance;
-    private bool isTablePlaced = false;
-    private bool isPlantPlaced = false;
-
-    // 식물 관련
-    private PlantGrowthStage currentGrowthStage = PlantGrowthStage.Seed;
-    private string selectedPlantType = "sunflower";
-    private float growthPoints = 0f;
-    private float maxGrowthPoints = 100f;
 
     // 상태
-    private bool isPlacementMode = true;
-    private Vector3 lastTouchPosition;
-    private float lastTouchTime;
+    public bool IsPlaced { get; private set; } = false;
+    private PlantGrowthStage currentStage = PlantGrowthStage.Seed;
+    private string selectedPlantType = "sunflower";
+    private float growthPoints = 0f;
+    
 
-    [System.Serializable]
-    public class PlantPrefabSet
+    private void Awake()
     {
-        public GameObject sprout;
-        public GameObject growing;
-        public GameObject blooming;
+        // Resources에서 프리팹 로드
+        LoadPrefabsFromResources();
     }
+
 
     private void Start()
     {
-        SetupInputActions();
-        InitializeAR();
-        LoadSelectedPlant();
-        UpdateInstructionText("화면을 터치해서 화분을 놓아보세요!");
+        SetupCamera();
+        SetupPlantType();
+        // UI 초기화
+        InitializeUI();
+        // 자동 시작
+        StartCoroutine(InitialSetup());
     }
 
-    private void SetupInputActions()
+    private void SetupCamera()
     {
-        if (inputActions == null) return;
-
-        var actionMap = inputActions.FindActionMap("AR Plant");
-        touchAction = actionMap.FindAction("Touch");
-        touchPositionAction = actionMap.FindAction("TouchPosition");
-        pinchAction = actionMap.FindAction("Pinch");
-    }
-
-    private void OnEnable()
-    {
-        if (touchAction != null)
+        // 카메라 찾기
+        if (arCamera == null)
         {
-            touchAction.started += OnTouchStarted;
-            touchAction.canceled += OnTouchEnded;
+            arCamera = Camera.main;
+            if (arCamera == null)
+                arCamera = FindAnyObjectByType<Camera>();
         }
-
-        touchAction?.Enable();
-        touchPositionAction?.Enable();
-        pinchAction?.Enable();
     }
 
-    private void OnDisable()
+    private void SetupPlantType()
     {
-        if (touchAction != null)
+        // 선택된 식물 타입 로드(기본값: sunflower)
+        string savedPlantType = PlayerPrefs.GetString("Matched_Plant", "");
+        Debug.Log($"Saved Plant Type from PlayerPrefs: '{savedPlantType}'");
+        if (!string.IsNullOrEmpty(savedPlantType))
         {
-            touchAction.started -= OnTouchStarted;
-            touchAction.canceled -= OnTouchEnded;
-        }
-
-        touchAction?.Disable();
-        touchPositionAction?.Disable();
-        pinchAction?.Disable();
-    }
-
-    private void InitializeAR()
-    { 
-        if(placementIndicator != null)
-            placementIndicator.SetActive(false);
-    }
-
-    private void LoadSelectedPlant()
-    {
-        // MBTI 결과에서 식물 타입 가져오기
-        selectedPlantType = PlayerPrefs.GetString("Matched_Plant", "sunflower").ToLower();
-        Debug.Log($"Selected plant type : {selectedPlantType}");
-    }
-
-    private void Update()
-    {
-        if (isPlacementMode)
-            UpdatePlacementIndicator();
-
-        HandlePinchForScale();
-    }
-
-    private void UpdatePlacementIndicator()
-    {
-        var screenCenter = arCamera.ViewportToScreenPoint(new Vector3(0.5f, 0.5f));
-        raycastHits.Clear();
-
-        if (raycastManager.Raycast(screenCenter, raycastHits, TrackableType.PlaneWithinPolygon))
-        {
-            var hit = raycastHits[0];
-
-            if (placementIndicator != null)
-            {
-                placementIndicator.SetActive(true);
-                placementIndicator.transform.SetPositionAndRotation(hit.pose.position, hit.pose.rotation);
-            }
+            selectedPlantType = savedPlantType.ToLower();
+            Debug.Log($"Plant type set to: {selectedPlantType}");
         }
         else
         {
-            if (placementIndicator != null)
-                placementIndicator.SetActive(false);
+            selectedPlantType = "sunflower";
         }
+        // 유효성 검사
+        ValidatePlantType();
+        Debug.Log($"Selected Plant: {GetCurrentPlantName()}");
     }
 
-    private void OnTouchStarted(InputAction.CallbackContext context)
+    private void LoadPrefabsFromResources()
     {
-        lastTouchPosition = touchPositionAction.ReadValue<Vector2>();
-        lastTouchTime = Time.time;
+        Debug.Log("Loading prefabs from Resources...");
+
+        // 식물 프리팹들 로드
+        LoadPlantPrefabs();
+
+        Debug.Log("Plant prefabs loading complete");
     }
 
-    private void OnTouchEnded(InputAction.CallbackContext context)
+    private void LoadPlantPrefabs()
     {
-        Vector2 currentTouchPosition = touchPositionAction.ReadValue<Vector2>();
-        float touchDuration = Time.time - lastTouchTime;
-        float touchDistance = Vector2.Distance(lastTouchPosition, currentTouchPosition);
+        // Sunflower
+        if (sunflowerSprout == null)
+            sunflowerSprout = LoadSinglePrefab("Sunflower_Sprout", "sunflower_sprout");
+        if (sunflowerGrowing == null)
+            sunflowerGrowing = LoadSinglePrefab("Sunflower_Growing", "sunflower_growing");
+        if (sunflowerBlooming == null)
+            sunflowerBlooming = LoadSinglePrefab("Sunflower_Blooming", "sunflower_blooming");
 
-        // 탭 감지
-        if (touchDuration < 0.3f && touchDistance < 50f)
-            ProcessTap(currentTouchPosition);
+        // Rose
+        if (roseSprout == null)
+            roseSprout = LoadSinglePrefab("Rose_Sprout", "rose_sprout");
+        if (roseGrowing == null)
+            roseGrowing = LoadSinglePrefab("Rose_Growing", "rose_growing");
+        if (roseBlooming == null)
+            roseBlooming = LoadSinglePrefab("Rose_Blooming", "rose_blooming");
+
+        // Cactus
+        if (cactusSprout == null)
+            cactusSprout = LoadSinglePrefab("Cactus_Sprout", "cactus_sprout");
+        if (cactusGrowing == null)
+            cactusGrowing = LoadSinglePrefab("Cactus_Growing", "cactus_growing");
+        if (cactusBlooming == null)
+            cactusBlooming = LoadSinglePrefab("Cactus_Blooming", "cactus_blooming");
+
+        // Lavender
+        if (lavenderSprout == null)
+            lavenderSprout = LoadSinglePrefab("Lavender_Sprout", "lavender_sprout");
+        if (lavenderGrowing == null)
+            lavenderGrowing = LoadSinglePrefab("Lavender_Growing", "lavender_growing");
+        if (lavenderBlooming == null)
+            lavenderBlooming = LoadSinglePrefab("Lavender_Blooming", "lavender_blooming");
     }
 
-    private void ProcessTap(Vector2 screenPosition)
+    private GameObject LoadSinglePrefab(string name1, string name2)
     {
-        if (isPlacementMode)
+        // 여러 경로 시도
+        string[] paths =
         {
-            PlaceTableAndPlant(screenPosition);
-        }
-        else
+            name1,name2,
+            $"Prefabs/{name1}", $"Prefabs/{name2}", $"Plants/{name1}", $"Plants/{name2}"
+        };
+
+        foreach(string path in paths)
         {
-            // 식물과 상호작용
-            InteractWithPlant(screenPosition);
-        }
-    }
-
-    private void PlaceTableAndPlant(Vector2 screenPosition)
-    {
-        raycastHits.Clear();
-
-        if (raycastManager.Raycast(screenPosition, raycastHits, TrackableType.PlaneWithinPolygon))
-        {
-            var hit = raycastHits[0];
-
-            // 탁자 배치
-            if (tablePrefab != null && !isTablePlaced)
+            GameObject prefab = Resources.Load<GameObject>(path);
+            if(prefab != null)
             {
-                tableInstance = Instantiate(tablePrefab, hit.pose.position, hit.pose.rotation);
-                isTablePlaced = true;
-
-                // 탁자 위에 씨앗 배치
-                Vector3 plantPosition = hit.pose.position + Vector3.up * 0.1f;
-                currentPlantInstance = Instantiate(seedPrefab, plantPosition, hit.pose.rotation);
-                isPlantPlaced = true;
-
-                // 배치 모드 종료
-                isPlacementMode = false;
-                if (placementIndicator != null)
-                    placementIndicator.SetActive(false);
-
-                // 평면 감지 비활성화(성능 향상)
-                if (planeManager != null)
-                {
-                    planeManager.enabled = false;
-                    foreach(var plane in planeManager.trackables)
-                    {
-                        plane.gameObject.SetActive(false);
-                    }
-                }
-
-                UpdateInstructionText("식물을 터치하거나 긍정적인 말을 해보세요!");
-                UpdateStatusText($"성장 단계: 씨앗 ({growthPoints:F0}/{maxGrowthPoints}");
+                Debug.Log($"Loaded: {path}");
+                return prefab;
             }
         }
+        Debug.LogWarning($"Could not find prefab: {name1}_{name2}");
+        return null;
     }
 
-    private void InteractWithPlant(Vector2 screenPosition)
+    private void ValidatePlantType()
     {
-        if (!isPlantPlaced) return;
-
-        Ray ray = arCamera.ScreenPointToRay(screenPosition);
-        RaycastHit hit;
-
-        // 식물 터치 감지
-        if (Physics.Raycast(ray, out hit))
+        if (selectedPlantType != "sunflower" && selectedPlantType != "rose" &&
+            selectedPlantType != "cactus" && selectedPlantType != "lavender")
         {
-            if (hit.collider.gameObject == currentPlantInstance ||
-                hit.collider.transform.IsChildOf(currentPlantInstance.transform))
-            {
-                // 터치 상호작용 수행
-                AddGrowthPoints(10f, "터치");
-                PlayTouchEffect(hit.point);
-            }
+            Debug.LogWarning($"Invalid plant type : {selectedPlantType}, using default: sunflower");
+            selectedPlantType = "sunflower";
         }
     }
 
-    private void HandlePinchForScale()
+    private void InitializeUI()
     {
-        if(Input.touchCount == 2)
-        {
-            Touch touch1 = Input.GetTouch(0);
-            Touch touch2 = Input.GetTouch(1);
+        if (voiceUI != null)
+            voiceUI.SetActive(false);
 
-            float currentDistance = Vector2.Distance(touch1.position, touch2.position);
+        UpdateInstruction($"{GetCurrentPlantName()}(이)가 준비되었습니다1");
+    }
 
-            if (touch1.phase == TouchPhase.Moved || touch2.phase == TouchPhase.Moved)
-            {
-                float prevDistance = Vector2.Distance(
-                    touch1.position - touch1.deltaPosition,
-                    touch2.position - touch2.deltaPosition);
+    private IEnumerator InitialSetup()
+    {
+        yield return new WaitForSeconds(initialSetupDelay);
 
-                float deltaDistance = currentDistance - prevDistance;
-
-                if (currentPlantInstance != null && Mathf.Abs(deltaDistance) > 10f)
-                {
-                    float scaleChange = deltaDistance * 0.001f;
-                    Vector3 newScale = currentPlantInstance.transform.localScale + Vector3.one * scaleChange;
-
-                    // 스케일 제한
-                    newScale = Vector3.Clamp(newScale, Vector3.one * 0.5f, Vector3.one * 2f);
-                    currentPlantInstance.transform.localScale = newScale;
-                }
-            }
-
-        }
+        SetupPreplacedObjects();
         
+        OnPlacementComplete();
     }
 
-    public void AddGrowthPoints(float points, string source)
+    private void SetupPreplacedObjects()
     {
-        growthPoints += points;
+        if (preplacedTable != null)
+        {
+            tableInstance = preplacedTable;
+            Debug.Log("Pre-placed table found and configured (FIXED)");
+        }
+        else
+        {
+            Debug.LogError("Pre-placed table not assigned! Please assign it in the inspector.");
+        }
+
+        if (plantSpawnPoint == null)
+        {
+            return;
+        }
+
+        // 미리 배치된 씨앗 설정 (시작용, 나중에 교체됨)
+        if (preplacedSeed != null)
+        {
+            // 씨앗을 Spawn Point 위치로 이동
+            preplacedSeed.transform.position = plantSpawnPoint.position;
+            preplacedSeed.transform.rotation = plantSpawnPoint.rotation;
+
+            currentPlantInstance = preplacedSeed;
+            Debug.Log("Pre-placed seed positioned at spawn point");
+        }
+        else
+        {
+            Debug.LogError("Pre-placed seed not assigned! Please assign it in the inspector.");
+        }
+
+        Debug.Log($"Plant Spawn Point position: {plantSpawnPoint.position}");
+    }
+
+    
+
+    private void OnPlacementComplete()
+    {
+        IsPlaced = true;
+
+        if (voiceUI != null)
+            voiceUI.SetActive(true);
+
+        // 음성 인식 시작
+        if (voiceController != null)
+        {
+            voiceController.enabled = true;
+            voiceController.OnVoiceRecognitionSuccess += OnVoiceSuccess;
+        }
+
+        UpdateInstruction("화면에 나오는 문장을 따라 말해보세요!");
+
+        // 시작 효과
+        if (successParticles != null && currentPlantInstance != null)
+        {
+            successParticles.transform.position = currentPlantInstance.transform.position;
+            successParticles.Play();
+        }
+    }
+
+    private void OnVoiceSuccess(string recognizedText)
+    {
+        // 성장 포인트 추가
+        growthPoints += pointsPerVoiceSuccess;
         growthPoints = Mathf.Clamp(growthPoints, 0f, maxGrowthPoints);
 
-        UpdateStatusText($"성장 단계: {GetStageKoreanName(currentGrowthStage)} (+{points} from {source}");
+        // 파티클 효과
+        if(successParticles != null && currentPlantInstance != null)
+        {
+            successParticles.transform.position = currentPlantInstance.transform.position;
+            successParticles.Play();
+        }
 
-        // 성장 단계 체크
-        CheckGrowthStage();
+        // UI 업데이트
+        UpdateInstruction($"잘했어요! 성장 포인트: {growthPoints:F0}/{maxGrowthPoints} (+{pointsPerVoiceSuccess})");
+
+        // 성장 체크
+        CheckGrowth();
     }
 
-    private void CheckGrowthStage()
+    private void CheckGrowth()
     {
-        PlantGrowthStage newStage = CalculateGrowthStage();
+        PlantGrowthStage newStage = PlantGrowthStage.Seed;
 
-        if (newStage != currentGrowthStage)
+        // 새로운 성장 단계 계산
+        if (growthPoints >= bloomingThreshold)
+            newStage = PlantGrowthStage.Blooming;
+        else if (growthPoints >= growingThreshold)
+            newStage = PlantGrowthStage.Growing;
+        else if (growthPoints >= sproutThreshold)
+            newStage = PlantGrowthStage.Sprout;
+
+        if (newStage != currentStage)
         {
-            currentGrowthStage = newStage;
-            UpdatePlantVisual();
-            UpdateInstructionText($"축하합니다! {GetStageKoreanName(currentGrowthStage)} 단계로 성장했어요!");
+            currentStage = newStage;
+            ChangePlant();
         }
     }
 
-    private PlantGrowthStage CalculateGrowthStage()
+    private void ChangePlant()
     {
-        if (growthPoints >= 75f) return PlantGrowthStage.Blooming;
-        if (growthPoints >= 50f) return PlantGrowthStage.Growing;
-        if (growthPoints >= 25f) return PlantGrowthStage.Sprout;
-        return PlantGrowthStage.Seed;
-    }
+        if (currentPlantInstance == null || plantSpawnPoint == null)
+        {
+            Debug.LogError("ChangePlant failed: currentPlantInstance or plantSpawnPoint is null");
+            return;
+        }
 
-    private void UpdatePlantVisual()
-    {
-        if (currentPlantInstance == null) return;
+        // 기존 식물의 정보 저장 (Spawn Point 기준으로)
+        Vector3 spawnPosition = plantSpawnPoint.position;
+        Quaternion spawnRotation = plantSpawnPoint.rotation;
+        Vector3 currentScale = currentPlantInstance.transform.localScale;
 
-        Vector3 position = currentPlantInstance.transform.position;
-        Quaternion rotation = currentPlantInstance.transform.rotation;
-        Vector3 scale = currentPlantInstance.transform.localScale;
+        Debug.Log($"Attempting to change plant to stage: {currentStage} for plant type: {selectedPlantType}");
+
+        // 새 식물 프리팹 가져오기
+        GameObject newPlantPrefab = GetPlantPrefab();
+
+        if (newPlantPrefab == null)
+        {
+            return;
+        }
+
+        Debug.Log($"Found prefab: {newPlantPrefab.name} for stage: {currentStage}");
 
         // 기존 식물 제거
-        Destroy(currentPlantInstance );
+        Destroy(currentPlantInstance);
 
-        // 새로운 단계의 식물 생성
-        GameObject newPlantPrefab = GetPlantPrefabForStage(currentGrowthStage);
-        if (newPlantPrefab != null)
+        // 새 식물 생성 (항상 Spawn Point 위치에)
+        currentPlantInstance = Instantiate(newPlantPrefab, spawnPosition, spawnRotation);
+
+        // 크기는 기존 것 유지 (또는 기본 크기 사용)
+        currentPlantInstance.transform.localScale = currentScale;
+
+        // 성장 파티클 (Spawn Point 위치에)
+        if (growthParticles != null)
         {
-            currentPlantInstance = Instantiate(newPlantPrefab, position, rotation);
-            currentPlantInstance.transform.localScale = scale;
+            growthParticles.transform.position = spawnPosition;
+            growthParticles.Play();
+        }
+
+        string stageName = GetStageName();
+        string celebrationMessage = GetCelebrationMessage();
+        UpdateInstruction(celebrationMessage);
+
+        Debug.Log($"Plant successfully changed to {newPlantPrefab.name} at spawn point: {spawnPosition}");
+
+        if (currentStage == PlantGrowthStage.Blooming)
+        {
+            OnPlantFullyGrown();
         }
     }
 
-    private GameObject GetPlantPrefabForStage(PlantGrowthStage stage)
+    private void OnPlantFullyGrown()
     {
-        PlantPrefabSet prefabSet = GetPrefabSetForPlantType(selectedPlantType);
-        if (prefabSet == null) return seedPrefab;
+        UpdateInstruction($"{GetCurrentPlantName()}(이)가 완전히 피어났어요!\n 당신의 긍정적인 말이 기적을 만들었습니다!");
+        if (voiceController != null)
+            voiceController.OnAllTargetsComplete();
 
-        switch (stage)
+        StartCoroutine(CelebrationEffect());
+    }
+
+    private IEnumerator CelebrationEffect()
+    {
+        for (int i = 0; i < 3; i++)
         {
-            case PlantGrowthStage.Sprout: return prefabSet.sprout;
-            case PlantGrowthStage.Growing: return prefabSet.growing;
-            case PlantGrowthStage.Blooming: return prefabSet.blooming;
-            default: return seedPrefab;
+            if (growthParticles != null)
+            {
+                growthParticles.transform.position = currentPlantInstance.transform.position;
+                growthParticles.Emit(30);
+            }
+            yield return new WaitForSeconds(0.5f);
         }
     }
 
-    private PlantPrefabSet GetPrefabSetForPlantType(string plantType)
+
+    private GameObject GetPlantPrefab()
     {
-        switch (plantType.ToLower())
+        if(currentStage == PlantGrowthStage.Seed)
+            return null;
+        
+        // 선택된 식물 타입에 따라 프리팹 반환
+        switch (selectedPlantType)
         {
-            case "sunflower": return sunflowerPrefabs;
-            case "rose": return rosePrefabs;
-            case "cactus": return cactusPrefabs;
-            case "lavender": return lavenderPrefabs;
-            default: return sunflowerPrefabs;
+            case "sunflower":
+                if(currentStage == PlantGrowthStage.Sprout) return sunflowerSprout;
+                if(currentStage == PlantGrowthStage.Growing) return sunflowerGrowing;
+                if(currentStage == PlantGrowthStage.Blooming) return sunflowerBlooming;
+                break;
+
+            case "rose":
+                if(currentStage == PlantGrowthStage.Sprout) return roseSprout;
+                if(currentStage == PlantGrowthStage.Growing) return roseGrowing;
+                if(currentStage == PlantGrowthStage.Blooming) return roseBlooming;
+                break;
+
+            case "cactus":
+                if(currentStage == PlantGrowthStage.Sprout) return cactusSprout;
+                if(currentStage == PlantGrowthStage.Growing) return cactusGrowing;
+                if(currentStage == PlantGrowthStage.Blooming) return cactusBlooming;
+                break;
+
+             case "lavender":
+                if(currentStage == PlantGrowthStage.Sprout) return lavenderSprout;
+                if(currentStage == PlantGrowthStage.Growing) return lavenderGrowing;
+                if(currentStage == PlantGrowthStage.Blooming) return lavenderBlooming;
+                break;
         }
+        return null;
     }
 
-    private void PlayTouchEffect(Vector3 position)
+    private string GetStageName()
     {
-        // 간단한 파티클 효과나 애니메이션
-        Debug.Log($"Touch effect at {position}");
-    }
-
-    private string GetStageKoreanName(PlantGrowthStage stage)
-    {
-        switch (stage)
+        switch (currentStage)
         {
-            case PlantGrowthStage.Seed: return "씨앗";
             case PlantGrowthStage.Sprout: return "새싹";
             case PlantGrowthStage.Growing: return "성장";
             case PlantGrowthStage.Blooming: return "개화";
-            default: return "알 수 없음";
+            default: return "씨앗";
+        }
+    }
+
+    private string GetCelebrationMessage()
+    {
+        switch (currentStage)
+        {
+            case PlantGrowthStage.Sprout:
+                return $"작은 새싹이 돋아났어요!\n{GetCurrentPlantName()}(이)가 당신의 따뜻한 말에 반응하고 있습니다.";
+            case PlantGrowthStage.Growing:
+                return $"쑥쑥 자라고 있어요!\n긍정적인 에너지가 {GetCurrentPlantName()}(을)를 건강하게 키우고 있습니다.";
+            case PlantGrowthStage.Blooming:
+                return $"완전히 피어났어요!\n당신의 사랑스러운 말들이 아름다운 {GetCurrentPlantName()}(을)를 완성했습니다!";
+            default:
+                return "성장하고 있어요!";
+        }
+    }
+
+    public string GetCurrentPlantName()
+    {
+        switch (selectedPlantType)
+        {
+            case "sunflower": return "해바라기";
+            case "rose": return "장미";
+            case "cactus": return "선인장";
+            case "lavender": return "라벤더";
+            default: return "식물";
         }
     }
 
     // UI 업데이트 메서드들
-    private void UpdateInstructionText(string message)
+    private void UpdateInstruction(string message)
     {
         if (instructionText != null)
             instructionText.text = message;
     }
 
-    private void UpdateStatusText(string message)
+    private void OnDestroy()
     {
-        if (statusText != null)
-            statusText.text = message;
-    }
-
-    // 음성 인식에서 호출할 메서드
-    public void OnPositiveSpeechDetected(float points)
-    {
-        AddGrowthPoints(points, "음성");
-    }
-
-    // 리셋 기능
-    public void ResetPlant()
-    {
-        if (tableInstance != null) Destroy(tableInstance);
-        if (currentPlantInstance != null) Destroy(currentPlantInstance);
-
-        isTablePlaced = false;
-        isPlantPlaced = false;
-        isPlacementMode = true;
-        currentGrowthStage = PlantGrowthStage.Seed;
-        growthPoints = 0f;
-
-        if (planeManager != null)
+        if (voiceController != null)
         {
-            planeManager.enabled = true;
-            foreach(var plane in planeManager.trackables)
-            {
-                plane.gameObject.SetActive(true);
-            }
+            voiceController.OnVoiceRecognitionSuccess -= OnVoiceSuccess;
         }
-
-        UpdateInstructionText("탁자를 터치해서 화분을 놓아보세요!");
     }
 }

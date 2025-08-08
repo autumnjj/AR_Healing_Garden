@@ -28,17 +28,17 @@ public class MBTIManager : MonoBehaviour
         InitializeScores();
         LoadUserData();
 
-        // 이미 테스틀르 완료했다면 바로 결과 표시
-        if(userData.HasData())
-        {
-            PlantDataSO matchedPlant = FindPlantById(userData.matchedPlantId);
-            OnTestComplete?.Invoke(userData, matchedPlant);
-        }
-        else
-        {
-            StartTest();
-        }
+        Debug.Log($"Loaded questions: {questionsData?.questions?.Count ?? 0}");
+        Debug.Log($"User has data: {userData.HasData()}");
+
+        Invoke(nameof(StartFreshTest), 0.1f);
     }
+    private void StartFreshTest()
+    {
+        Debug.Log("Starting fresh test with questions");
+        StartTest();
+    }
+
 
     private void LoadDataFromResources()
     {
@@ -112,7 +112,8 @@ public class MBTIManager : MonoBehaviour
     {
         if(questionsData != null && currentQuestionIndex < questionsData.questions.Count)
         {
-            OnQuestionChanged?.Invoke(questionsData.questions[currentQuestionIndex]);
+            var question = questionsData.questions[currentQuestionIndex];
+            OnQuestionChanged?.Invoke(question);
         }
     }
 
@@ -206,7 +207,7 @@ public class MBTIManager : MonoBehaviour
         Dictionary<string, string> mbtiToPlantId = new Dictionary<string, string>
        {
            // 해바라기 그룹(외향적, 활발한)
-           {"ENFP", "Sunflower" }, {"ENFJ", "Sunflower" }, {"ESFP", "Sunflower" }, {"ESFJ", "Sunflower" },
+           {"ENFP", "sunflower" }, {"ENFJ", "sunflower" }, {"ESFP", "sunflower" }, {"ESFJ", "sunflower" },
 
            // 선인장 그룹(독립적, 강인한)
            {"INTJ", "cactus" }, {"INTP", "cactus" }, {"ENTJ", "cactus" }, {"ENTP", "cactus" },
@@ -234,49 +235,6 @@ public class MBTIManager : MonoBehaviour
         // 못찾으면 첫번째 식물 반환
         Debug.LogWarning($"Cant not find Plant ID '{targetPlantId}' use basic plant");
         return plantDatabase[0];
-        /*
-        if (plantDatabase.Count == 0)
-        {
-            Debug.LogError("PlantDatabase is empty");
-            return null;
-        }
-
-        // 1순위 : 완전 매칭
-        foreach(var plant in plantDatabase)
-        {
-            if (plant.primaryMBTI.Contains(mbtiType))
-            {
-                return plant;
-            }
-        }
-
-        // 2순위 : 보조 매칭
-        foreach(var plant in plantDatabase)
-        {
-            if (plant.secondaryMBTI.Contains(mbtiType))
-            {
-                return plant;
-            }
-        }
-
-        // 3순위 : 유사도 매칭
-        PlantDataSO bestMatch = plantDatabase[0];
-        int maxSimilarity = 0;
-
-        foreach (var plant in plantDatabase)
-        {
-            foreach(var plantMBTI in plant.primaryMBTI)
-            {
-                int similarity = CalculateSimilarity(mbtiType, plantMBTI);
-                if (similarity > maxSimilarity)
-                {
-                    maxSimilarity = similarity;
-                    bestMatch = plant;
-                }
-            }
-        }
-        return bestMatch;
-        */
     }
 
     int CalculateSimilarity(string type1, string type2)

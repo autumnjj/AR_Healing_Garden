@@ -17,6 +17,9 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/01_Scenes/VoiceTestScene.unity
     guid: fea1575e4350d9c47a17f08d56823099
+  - enabled: 0
+    path: Assets/01_Scenes/02_MainScene.unity
+    guid: 3064242700ae12b42923a7f87e849c33
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 1729ed811f94b7d489b64178d3d8f73b, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

@@ -1,300 +1,206 @@
-using System.Collections;
 using UnityEngine;
-using UnityEngine.Rendering;
+using UnityEngine.InputSystem;
 
 public class ARPlantController : MonoBehaviour
 {
-    [Header("Plant Visual Components")]
-    public Renderer plantRenderer;
-    public Animator plantAnimator;
+    [Header("프리팹 회전 보정 설정")]
+    public Vector3 prefabDefaultRotation = new Vector3(90, 0, 0);
+    public bool applyRotationCorrection = true;
 
-    [Header("Touch Feedback")]
-    public GameObject touchFeedbackPrefab;
-    public AudioClip touchSound;
+    [Header("Input Actions")]
+    public InputActionAsset inputActions;
 
-    [Header("Billboard Settings")]
-    public bool enableBillboard = true;
-    public Transform billboardTarget;
+    [Header("드래그 설정")]
+    public float dragSpeed = 0.5f;
 
-    [Header("Growth Effects")]
-    public ParticleSystem growthParticles;
+    // Input Actions
+    private InputAction touchAction;
+    private InputAction touchPositionAction;
+    private InputAction touchDeltaAction;
 
-    private PlantGrowthData growthData;
-    private PlantGrowthUI growthUI;
+    private bool isDragging = false;
+    private Vector2 lastTouchPosition;
     private Camera arCamera;
-    private AudioSource audioSource;
 
-    // Billboard 관련
-    private Vector3 originalRotation;
+    // 이벤트
+    public System.Action<Vector2> OnDragDelta;
+    public System.Action OnDragStart;
+    public System.Action OnDragEnd;
 
     private void Start()
     {
-        SetupComponents();
-        SetupBillboard();
+        ApplyRotationCorrection();
+        SetupInputActions();
+        FindARCamera();
     }
 
-    private void SetupComponents()
+   
+    private void FindARCamera()
     {
         arCamera = Camera.main;
-        if(arCamera == null)
-        {
+        if (arCamera == null )
             arCamera = FindAnyObjectByType<Camera>();
-        }
-
-        if(billboardTarget == null && arCamera != null)
-        {
-            billboardTarget = arCamera.transform;
-        }
-
-        if(plantRenderer == null)
-        {
-            plantRenderer = GetComponentInChildren<Renderer>();
-        }
-
-        if (plantAnimator == null)
-        {
-            plantAnimator = GetComponentInChildren<Animator>();
-        }
-
-        if (audioSource == null)
-        {
-            audioSource = GetComponent<AudioSource>();
-            if(audioSource == null)
-            {
-                audioSource = gameObject.AddComponent<AudioSource>();
-            }
-        }
-
-        originalRotation = transform.eulerAngles;
     }
 
-    private void SetupBillboard()
+    private void ApplyRotationCorrection()
     {
-        if(enableBillboard && billboardTarget != null)
+        if (applyRotationCorrection)
         {
-            // 카메라를 향하도록 초기 회전 설정
-            LookAtCamera();
+            transform.rotation = Quaternion.Euler(prefabDefaultRotation);
+            Debug.Log($"{gameObject.name} : 회전 보정 적용됨 - {prefabDefaultRotation}");
         }
+    }
+
+    private void SetupInputActions()
+    {
+        if (inputActions == null) return;
+
+        var actionMap = inputActions.FindActionMap("AR Plant");
+        if (actionMap != null)
+        {
+            touchAction = actionMap.FindAction("Touch");
+            touchPositionAction = actionMap.FindAction("TouchPosition");
+            touchDeltaAction = actionMap.FindAction("TouchDelta");
+
+            if (touchDeltaAction == null)
+                Debug.LogWarning("TouchDelta action not found. Creating fallback");
+        }
+    }
+
+    private void OnEnable()
+    {
+        if (touchAction != null)
+        {
+            touchAction.started += OnTouchStarted;
+            touchAction.canceled += OnTouchEnded;
+            touchAction?.Enable();
+        }
+
+        touchPositionAction?.Enable();
+        touchDeltaAction?.Enable();
+    }
+
+    private void OnDisable()
+    {
+        if (touchAction != null)
+        {
+            touchAction.started -= OnTouchStarted;
+            touchAction.canceled -= OnTouchEnded;
+            touchAction?.Disable();
+        }
+
+        touchPositionAction?.Disable();
+        touchDeltaAction?.Disable();
+    }
+
+    private void OnTouchStarted(InputAction.CallbackContext context)
+    {
+       isDragging = true;
+        lastTouchPosition = Vector2.zero;
+        OnDragStart?.Invoke();
+        Debug.Log("Touch started on" + gameObject.name);
+    }
+
+    private void OnTouchEnded(InputAction.CallbackContext context)
+    {
+        isDragging = false;
+        OnDragEnd?.Invoke();
+        Debug.Log("Touch ended on " + gameObject.name);
     }
 
     private void Update()
     {
-        if(enableBillboard && billboardTarget != null)
-        {
-            LookAtCamera();
-        }
+        if (isDragging)
+            HandleDragging();
     }
 
-    private void LookAtCamera()
+    private void HandleDragging()
     {
-        Vector3 targetPosition = billboardTarget.position;
-        targetPosition.y = transform.position.y;
+        Vector2 delta = Vector2.zero;
 
-        transform.LookAt(targetPosition);
-        transform.Rotate(0, 180, 0);
-    }
-
-    public void Initialize(PlantGrowthData growthData, PlantGrowthUI growthUI)
-    {
-        this.growthData = growthData;
-        this.growthUI = growthUI;
-
-        if(growthData != null)
+        // TouchDelta가 있으면 사용, 없으면 수동 계산
+        if (touchDeltaAction != null)
         {
-            growthData.OnStageChanged += OnStageChanged;
-            growthData.OnInteractionPerformed += OnInteractionPerformed;
+            delta = touchDeltaAction.ReadValue<Vector2>();
         }
-
-        UpdateVisualState();
-    }
-
-    public void OnTouchFeedback(Vector3 touchWorldPosition)
-    {
-        // 터치 위치에 피드백 효과 생성
-        if(touchFeedbackPrefab != null)
+        else if (touchPositionAction != null)
         {
-            GameObject feedback = Instantiate(touchFeedbackPrefab, touchWorldPosition, Quaternion.identity);
-            Destroy(feedback, 2f);
-        }
-
-        // 터치 사운드 재생
-        if (audioSource != null && touchSound != null) 
-        {
-            audioSource.PlayOneShot(touchSound);
-        }
-
-        // 시각적 피드백
-        StartCoroutine(TouchVisualFeedback());
-
-        Debug.Log($"Touch feedback at position : {touchWorldPosition}");
-    }
-
-    private IEnumerator TouchVisualFeedback()
-    {
-        if (plantRenderer != null) 
-        {
-            Color originalColor = plantRenderer.material.color;
-            Color brightColor = Color.white;
-
-            // 밝게 깜빡임
-            for (int i = 0; i < 3; i++)
+            // 수동으로 delta 계산(이전 프레임과의 차이)
+            Vector2 currentPos = touchPositionAction.ReadValue<Vector2>();
+            if (lastTouchPosition != Vector2.zero)
             {
-                plantRenderer.material.color = brightColor;
-                yield return new WaitForSeconds(0.1f);
-                plantRenderer.material.color = originalColor;
-                yield return new WaitForSeconds(0.1f);
+                delta = currentPos - lastTouchPosition;
             }
+            lastTouchPosition = currentPos;
         }
-    }
 
-    private void OnStageChanged(PlantGrowthStage newStage)
-    {
-        UpdateVisualState();
-        PlayGrowthEffect();
-
-        // 애니메이션 트리거
-        if(plantAnimator != null)
+        if (delta != Vector2.zero)
         {
-            //plantAnimator.SetTrigger("GrowthStage");
-            //plantAnimator.SetTrigger("Stagee", (int)newStage);
+            OnDragDelta?.Invoke(delta);
+
+            AdjustPosition(delta);
         }
+         
     }
 
-    private void OnInteractionPerformed(InteractionType interactionType, float points)
+    public void AdjustPosition(Vector2 delta)
     {
-        // 상호작용별 시각적 피드백
-        switch (interactionType)
+        if (arCamera == null) return;
+
+        // 화면 드래그를 월드 좌표 이동으로 변환
+        Vector3 movement = new Vector3(delta.x, 0, delta.y) * dragSpeed * 0.001f;
+
+        // 카메라 기준으로 이동 방향 변환
+        movement = arCamera.transform.TransformDirection(movement);
+        movement.y = 0;
+
+        // 위치 업데이트
+        transform.position += movement;
+
+        // 거리 제한
+        ConstrainDistance();
+    }
+
+    private void ConstrainDistance()
+    {
+        if (arCamera == null) return;
+
+        Vector3 toCamera = transform.position - arCamera.transform.position;
+        toCamera.y = 0;
+        float distance = toCamera.magnitude;
+
+        // 거리 제한
+        if (distance < 0.5f || distance > 3f)
         {
-            case InteractionType.PositiveTalk:
-                PlayTalkEffect();
-                break;
-            case InteractionType.WaterGiving:
-                PlayWaterEffect();
-                break;
-            case InteractionType.TouchCare:
-                OnTouchFeedback(transform.position);
-                break;
-            case InteractionType.SunlightGiving:
-                PlaySunlightEffect();
-                break;
+            toCamera = toCamera.normalized * Mathf.Clamp(distance, 0.5f, 3f);
+            Vector3 newPosition = arCamera.transform.position + toCamera;
+            newPosition.y = transform.position.y;
+            transform.position = newPosition;
         }
     }
 
-    private void UpdateVisualState()
+    // 회전 보정값 변경
+    public void SetRotationCorrection(Vector3 newRotation)
     {
-        if (growthData == null) return;
-
-        var currentState = growthData.GetCurrentState().currentStage;
-        var stageData = growthData.GetCurrentStageData();
-
-        if (stageData != null) 
-        {
-            if(plantRenderer != null)
-            {
-                plantRenderer.material.color = stageData.stageColor;
-            }
-
-            // 크기 변경
-            transform.localScale = stageData.stageScale;
-
-            // 스프라이트 변경(2D 식물의 경우)
-            var spriteRenderer = GetComponent<SpriteRenderer>();
-            if(spriteRenderer != null && stageData.stageSprite != null)
-            {
-                spriteRenderer.sprite = stageData.stageSprite;
-            } 
-        }
+        prefabDefaultRotation = newRotation;
+        ApplyRotationCorrection();
     }
 
-    private void PlayGrowthEffect()
+    // 회전 보정 즉시 적용
+    public void ForceApplyRotationCorrection()
     {
-        if(growthParticles != null)
-        {
-            growthParticles.Play();
-        }
-
-        // 성장 시 펄스 효과
-        StartCoroutine(PulseEffect());
+        ApplyRotationCorrection();
     }
 
-    private void PlayTalkEffect()
+    // 드래그 활성화/비활성화
+    public void SetDragEnabled(bool enabled)
     {
-        Debug.Log("Playing talk effect");
+        this.enabled = enabled;
     }
 
-    private void PlayWaterEffect()
+    // 현재 드래그 상태 확인
+    public bool IsDragging()
     {
-        Debug.Log("Playing water effect");
-    }
-
-    private void PlaySunlightEffect()
-    {
-        Debug.Log("Playing sunlight effect");
-    }
-
-    private IEnumerator PulseEffect()
-    {
-        Vector3 originalScale = transform.localScale;
-        Vector3 targetScale = originalScale * 1.2f;
-
-        float duration = 0.5f;
-        float elapsedTime = 0f;
-
-        // 확대
-        while(elapsedTime < duration)
-        {
-            float t = elapsedTime / duration;
-            transform.localScale = Vector3.Lerp(originalScale, targetScale, t);
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        elapsedTime = 0f;
-
-        // 축소
-        while(elapsedTime < duration)
-        {
-            float t = elapsedTime / duration;
-            transform.localScale = Vector3.Lerp(targetScale, originalScale, t);
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        transform.localScale = originalScale;
-    }
-
-    // Bilboard 설정 변경
-    public void SetBillboardEnabled(bool enabled)
-    {
-        enableBillboard = enabled;
-
-        if (!enabled)
-        {
-            transform.eulerAngles = originalRotation;
-        }
-    }
-
-    // 식물 하이라이트 효과
-    public void HighlightPlant(bool highlight)
-    {
-        if(plantRenderer != null)
-        {
-            if (highlight)
-            {
-                // 외각선 효과나 밝기 증가
-                plantRenderer.material.SetFloat("_Brightness", 1.5f);
-            }
-            else
-            {
-                plantRenderer.material.SetFloat("_Brightness", 1.0f);
-            }
-        }
-    }
-
-    private void OnDestroy()
-    {
-        if(growthData != null)
-        {
-            growthData.OnStageChanged -= OnStageChanged;
-            growthData.OnInteractionPerformed -= OnInteractionPerformed;
-        }
+        return isDragging;
     }
 }
