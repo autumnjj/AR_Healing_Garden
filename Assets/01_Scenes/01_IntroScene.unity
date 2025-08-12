@@ -167,7 +167,7 @@ MonoBehaviour:
   autoSpawnOnStart: 1
   fixedPosition: {x: 0, y: -0.8, z: 2}
   faceCamera: 1
-  additionalRotation: {x: 0, y: 2, z: 0}
+  additionalRotation: {x: 0, y: 165, z: 0}
   arCamera: {fileID: 353690301}
   idleFloatAmount: 0.1
   idleFloatSpeed: 2
@@ -2521,7 +2521,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.1764706, g: 0.21568628, b: 0.28235295, a: 1}
+  m_Color: {r: 0.49411768, g: 0.64705884, b: 0.42352945, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2916,7 +2916,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.1764706, g: 0.21568628, b: 0.28235295, a: 1}
+  m_Color: {r: 0.49411768, g: 0.64705884, b: 0.42352945, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

@@ -40,9 +40,8 @@ public class ARPlantManager : MonoBehaviour
     [Header("Voice Recognition")]
     public ARPlantVoiceController voiceController;
 
-    [Header("Visual Effects")]
-    public ParticleSystem growthParticles;
-    public ParticleSystem successParticles;
+    [Header("Image Effect")]
+    public SimpleImageEffects imageEffects;
 
     [Header("Growth Settings")]
     [Range(50f, 200f)]
@@ -56,7 +55,13 @@ public class ARPlantManager : MonoBehaviour
 
     [Header("Setup Settings")]
     public float initialSetupDelay = 1.0f;
-    
+
+    [Header("Plant Positioning Strategy")]
+    public float pivotCenterOffset = 0.15f;
+
+    private Vector3 seedOriginalPosition;  // Seed의 원래 위치 저장
+    private Quaternion seedOriginalRotation; // Seed의 원래 회전 저장
+
     // 오브젝트
     private GameObject tableInstance;
     private GameObject currentPlantInstance;
@@ -112,17 +117,12 @@ public class ARPlantManager : MonoBehaviour
         }
         // 유효성 검사
         ValidatePlantType();
-        Debug.Log($"Selected Plant: {GetCurrentPlantName()}");
     }
 
     private void LoadPrefabsFromResources()
     {
-        Debug.Log("Loading prefabs from Resources...");
-
         // 식물 프리팹들 로드
         LoadPlantPrefabs();
-
-        Debug.Log("Plant prefabs loading complete");
     }
 
     private void LoadPlantPrefabs()
@@ -178,7 +178,6 @@ public class ARPlantManager : MonoBehaviour
                 return prefab;
             }
         }
-        Debug.LogWarning($"Could not find prefab: {name1}_{name2}");
         return null;
     }
 
@@ -203,9 +202,7 @@ public class ARPlantManager : MonoBehaviour
     private IEnumerator InitialSetup()
     {
         yield return new WaitForSeconds(initialSetupDelay);
-
         SetupPreplacedObjects();
-        
         OnPlacementComplete();
     }
 
@@ -214,11 +211,6 @@ public class ARPlantManager : MonoBehaviour
         if (preplacedTable != null)
         {
             tableInstance = preplacedTable;
-            Debug.Log("Pre-placed table found and configured (FIXED)");
-        }
-        else
-        {
-            Debug.LogError("Pre-placed table not assigned! Please assign it in the inspector.");
         }
 
         if (plantSpawnPoint == null)
@@ -229,22 +221,18 @@ public class ARPlantManager : MonoBehaviour
         // 미리 배치된 씨앗 설정 (시작용, 나중에 교체됨)
         if (preplacedSeed != null)
         {
-            // 씨앗을 Spawn Point 위치로 이동
-            preplacedSeed.transform.position = plantSpawnPoint.position;
-            preplacedSeed.transform.rotation = plantSpawnPoint.rotation;
+            // Seed의 현재 위치를 원래 위치로 저장 (씬에서 배치한 위치)
+            seedOriginalPosition = preplacedSeed.transform.position;
+            seedOriginalRotation = preplacedSeed.transform.rotation;
+
+            // PlantSpawnPoint를 Seed 위치로 업데이트
+            plantSpawnPoint.position = seedOriginalPosition;
+            plantSpawnPoint.rotation = seedOriginalRotation;
 
             currentPlantInstance = preplacedSeed;
-            Debug.Log("Pre-placed seed positioned at spawn point");
         }
-        else
-        {
-            Debug.LogError("Pre-placed seed not assigned! Please assign it in the inspector.");
-        }
-
-        Debug.Log($"Plant Spawn Point position: {plantSpawnPoint.position}");
     }
 
-    
 
     private void OnPlacementComplete()
     {
@@ -262,12 +250,6 @@ public class ARPlantManager : MonoBehaviour
 
         UpdateInstruction("화면에 나오는 문장을 따라 말해보세요!");
 
-        // 시작 효과
-        if (successParticles != null && currentPlantInstance != null)
-        {
-            successParticles.transform.position = currentPlantInstance.transform.position;
-            successParticles.Play();
-        }
     }
 
     private void OnVoiceSuccess(string recognizedText)
@@ -276,12 +258,8 @@ public class ARPlantManager : MonoBehaviour
         growthPoints += pointsPerVoiceSuccess;
         growthPoints = Mathf.Clamp(growthPoints, 0f, maxGrowthPoints);
 
-        // 파티클 효과
-        if(successParticles != null && currentPlantInstance != null)
-        {
-            successParticles.transform.position = currentPlantInstance.transform.position;
-            successParticles.Play();
-        }
+        if (imageEffects != null)
+            imageEffects.PlayVoiceSuccessEffect();
 
         // UI 업데이트
         UpdateInstruction($"잘했어요! 성장 포인트: {growthPoints:F0}/{maxGrowthPoints} (+{pointsPerVoiceSuccess})");
@@ -317,9 +295,7 @@ public class ARPlantManager : MonoBehaviour
             return;
         }
 
-        // 기존 식물의 정보 저장 (Spawn Point 기준으로)
-        Vector3 spawnPosition = plantSpawnPoint.position;
-        Quaternion spawnRotation = plantSpawnPoint.rotation;
+        Quaternion currentRotation = currentPlantInstance.transform.rotation;
         Vector3 currentScale = currentPlantInstance.transform.localScale;
 
         Debug.Log($"Attempting to change plant to stage: {currentStage} for plant type: {selectedPlantType}");
@@ -337,30 +313,47 @@ public class ARPlantManager : MonoBehaviour
         // 기존 식물 제거
         Destroy(currentPlantInstance);
 
-        // 새 식물 생성 (항상 Spawn Point 위치에)
-        currentPlantInstance = Instantiate(newPlantPrefab, spawnPosition, spawnRotation);
+        // 3D 오브젝트의 중간 pivot 보정
+        Vector3 spawnPosition = plantSpawnPoint.position;
+        if (currentStage != PlantGrowthStage.Seed)
+        {
+            spawnPosition.y += pivotCenterOffset;
+            Debug.Log($"Applied pivot center offset: {pivotCenterOffset}");
+        }
 
-        // 크기는 기존 것 유지 (또는 기본 크기 사용)
+        // 새 식물 생성 - 보정된 위치 사용
+        currentPlantInstance = Instantiate(newPlantPrefab, spawnPosition, plantSpawnPoint.rotation);
+
+        // 크기는 기존 것 유지
         currentPlantInstance.transform.localScale = currentScale;
 
-        // 성장 파티클 (Spawn Point 위치에)
-        if (growthParticles != null)
+        // 성장 단계별 이미지 이펙트 (여기서만!)
+        if (imageEffects != null)
         {
-            growthParticles.transform.position = spawnPosition;
-            growthParticles.Play();
+            switch (currentStage)
+            {
+                case PlantGrowthStage.Sprout:
+                    imageEffects.PlaySproutEffect();
+                    break;
+                case PlantGrowthStage.Growing:
+                    imageEffects.PlayGrowingEffect();
+                    break;
+                case PlantGrowthStage.Blooming:
+                    imageEffects.PlayBloomingEffect();
+                    break;
+            }
         }
 
         string stageName = GetStageName();
         string celebrationMessage = GetCelebrationMessage();
         UpdateInstruction(celebrationMessage);
 
-        Debug.Log($"Plant successfully changed to {newPlantPrefab.name} at spawn point: {spawnPosition}");
-
         if (currentStage == PlantGrowthStage.Blooming)
         {
             OnPlantFullyGrown();
         }
     }
+
 
     private void OnPlantFullyGrown()
     {
@@ -373,17 +366,8 @@ public class ARPlantManager : MonoBehaviour
 
     private IEnumerator CelebrationEffect()
     {
-        for (int i = 0; i < 3; i++)
-        {
-            if (growthParticles != null)
-            {
-                growthParticles.transform.position = currentPlantInstance.transform.position;
-                growthParticles.Emit(30);
-            }
-            yield return new WaitForSeconds(0.5f);
-        }
+        yield return new WaitForSeconds(1.5f);
     }
-
 
     private GameObject GetPlantPrefab()
     {
@@ -436,11 +420,11 @@ public class ARPlantManager : MonoBehaviour
         switch (currentStage)
         {
             case PlantGrowthStage.Sprout:
-                return $"작은 새싹이 돋아났어요!\n{GetCurrentPlantName()}(이)가 당신의 따뜻한 말에 반응하고 있습니다.";
+                return $"작은 새싹이 돋아났어요!";
             case PlantGrowthStage.Growing:
-                return $"쑥쑥 자라고 있어요!\n긍정적인 에너지가 {GetCurrentPlantName()}(을)를 건강하게 키우고 있습니다.";
+                return $"쑥쑥 자라고 있어요!";
             case PlantGrowthStage.Blooming:
-                return $"완전히 피어났어요!\n당신의 사랑스러운 말들이 아름다운 {GetCurrentPlantName()}(을)를 완성했습니다!";
+                return $"완전히 피어났어요!";
             default:
                 return "성장하고 있어요!";
         }

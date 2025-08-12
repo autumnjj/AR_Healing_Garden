@@ -1,0 +1,114 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+
+public class SimpleImageEffects : MonoBehaviour
+{
+    [Header("기존 UI 캔버스")]
+    public GameObject imagePanel;
+
+    [Header("이펙트 이미지")]
+    public Image voiceSuccessImage;
+    public Image sproutImage;
+    public Image growingImage;
+    public Image bloomingImage;
+
+    [Header("표시 설정")]
+    public float displayDuration = 1.5f;
+
+    private void Start()
+    {
+        HideAllImages();
+    }
+
+    private void HideAllImages()
+    {
+        if (voiceSuccessImage != null) voiceSuccessImage.gameObject.SetActive(false);
+        if (sproutImage != null) sproutImage.gameObject.SetActive(false);
+        if (growingImage != null) growingImage.gameObject.SetActive(false);
+        if (bloomingImage != null) bloomingImage.gameObject.SetActive(false);
+    }
+
+    // 음성 성공시 이펙트
+    public void PlayVoiceSuccessEffect()
+    {
+        ShowImage(voiceSuccessImage);
+        Debug.Log("VoiceSuccessImage");
+    }
+
+    // 새싹 단계 이펙트
+    public void PlaySproutEffect()
+    {
+        ShowImage(sproutImage);
+    }
+
+    // 성장 단계 이펙트
+    public void PlayGrowingEffect()
+    {
+        ShowImage(growingImage);
+    }
+
+    // 개화 단계 이펙트
+    public void PlayBloomingEffect()
+    {
+        ShowImage(bloomingImage);
+    }
+
+    private void ShowImage(Image targetImage)
+    {
+        if (targetImage == null) return;
+
+        StopAllCoroutines();
+
+        HideAllImages();
+        targetImage.gameObject.SetActive(true);
+
+        if (imagePanel != null)
+            imagePanel.SetActive(true);
+
+        StartCoroutine(HideImageAfterDelay(targetImage));
+    }
+
+    private IEnumerator HideImageAfterDelay(Image targetImage)
+    {
+        yield return new WaitForSeconds(displayDuration);
+
+        if (targetImage != null)
+            targetImage.gameObject.SetActive(false);
+
+        if (imagePanel != null && !IsAnyImageShowing())
+        {
+            imagePanel.SetActive(false);
+        }
+    }
+
+    public void HideAllImagesImmediately()
+    {
+        StopAllCoroutines();
+        HideAllImages();
+
+        if (imagePanel != null)
+            imagePanel.SetActive(false);
+    }
+
+    // 표시 시간 변경
+    public void SetDisplayDuration(float duration)
+    {
+        displayDuration = duration;
+    }
+
+    // 현재 어떤 이미지라도 표시 중인지 확인
+    public bool IsAnyImageShowing()
+    {
+        return (voiceSuccessImage != null && voiceSuccessImage.gameObject.activeInHierarchy) ||
+               (sproutImage != null && sproutImage.gameObject.activeInHierarchy) ||
+               (growingImage != null && growingImage.gameObject.activeInHierarchy) ||
+               (bloomingImage != null && bloomingImage.gameObject.activeInHierarchy);
+    }
+
+    // 특정 이미지가 표시 중인지 확인
+    public bool IsImageShowing(Image targetImage)
+    {
+        return targetImage != null && targetImage.gameObject.activeInHierarchy;
+    }
+}
