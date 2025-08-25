@@ -561,7 +561,7 @@ MonoBehaviour:
   voiceController: {fileID: 303099664}
   imageEffects: {fileID: 1357010830}
   maxGrowthPoints: 100
-  pointsPerVoiceSuccess: 15
+  pointsPerVoiceSuccess: 40
   sproutThreshold: 45
   growingThreshold: 90
   bloomingThreshold: 100

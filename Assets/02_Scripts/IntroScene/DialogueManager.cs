@@ -1,6 +1,7 @@
 using UnityEngine;
 using TMPro;
 using System.Collections;
+using UnityEngine.UI;
 
 [System.Serializable]
 public class DialogueLine
@@ -28,6 +29,10 @@ public class DialogueManager : MonoBehaviour
     [Header("대화 내용")]
     public DialogueLine[] dialogueLines;
 
+    [Header("Skip 버튼")]
+    public Button skipButton;
+    public float skipButtonDelayTime = 5f;
+
     private TextMeshProUGUI dialogueText;
 
     // 상태
@@ -35,6 +40,7 @@ public class DialogueManager : MonoBehaviour
     private bool isPlaying = false;
     private bool isTyping = false;
     private bool isAudioPlaying = false;
+    private bool isSkipped = false;
 
     private Coroutine dialogueCoroutine;
     private Coroutine typingCoroutine;
@@ -51,6 +57,7 @@ public class DialogueManager : MonoBehaviour
     {
         SetupDialogue();
         SetupDefaultDialogue();
+        SetupSkipButton();
     }
 
     private void SetupDialogue()
@@ -60,6 +67,15 @@ public class DialogueManager : MonoBehaviour
 
         if (dialogueText != null)
             dialogueText.text = "";
+    }
+
+    private void SetupSkipButton()
+    {
+        if (skipButton != null)
+        {
+            skipButton.gameObject.SetActive(false);
+            skipButton.onClick.AddListener(SkipDialogue);
+        }
     }
 
     private void SetupDefaultDialogue()
@@ -115,7 +131,10 @@ public class DialogueManager : MonoBehaviour
         if (isPlaying) return;
 
         isPlaying = true;
+        isSkipped = false;
         currentLineIndex = 0;
+
+        StartCoroutine(ShowSkipButtonAfterDelay());
 
         OnDialogueStart?.Invoke();
         dialogueCoroutine = StartCoroutine(PlayDialogueSequence());
@@ -123,10 +142,66 @@ public class DialogueManager : MonoBehaviour
         Debug.Log("Dialogue Started");
     }
 
+    public void SkipDialogue()
+    {
+        if (!isPlaying) return;
+
+        Debug.Log("Dialogue Skipped by user");
+
+        isSkipped = true;
+
+        StopAllDialogueCoroutine();
+
+        if (voiceAudioSource != null && voiceAudioSource.isPlaying)
+        {
+            voiceAudioSource.Stop();
+        }
+
+        CompleteDialogue();
+    }
+
+    private IEnumerator ShowSkipButtonAfterDelay()
+    {
+        float elapsedTime = 0f;
+        while (elapsedTime < skipButtonDelayTime && !isSkipped && isPlaying)
+        {
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!isSkipped && isPlaying && skipButton != null)
+        {
+            skipButton.gameObject.SetActive(true);
+            Debug.Log("Skip button is now available");
+        }
+    }
+
+    private void StopAllDialogueCoroutine()
+    {
+        if (dialogueCoroutine != null)
+        {
+            StopCoroutine(dialogueCoroutine);
+            dialogueCoroutine = null;
+        }
+        if (typingCoroutine != null)
+        {
+            StopCoroutine(typingCoroutine);
+            typingCoroutine = null;
+        }
+        if(audioCoroutine != null)
+        {
+            StopCoroutine(audioCoroutine);
+            audioCoroutine = null;
+        }
+    }
+
+
     private IEnumerator PlayDialogueSequence()
     {
         for (int i = 0; i < dialogueLines.Length; i++)
         {
+            if (isSkipped) yield break;
+
             currentLineIndex = i;
             var line = dialogueLines[i];
 
@@ -157,6 +232,8 @@ public class DialogueManager : MonoBehaviour
 
     private IEnumerator PlayLineWithSync(DialogueLine line)
     {
+        if (isSkipped) yield break;
+
         // 1. 오디오와 텍스트 동시 시작
         audioCoroutine = StartCoroutine(PlayAudio(line));
         typingCoroutine = StartCoroutine(TypeTextSynced(line));
@@ -177,11 +254,13 @@ public class DialogueManager : MonoBehaviour
 
     private IEnumerator PlayAudio(DialogueLine line)
     {
-        if (line.voiceClip == null) yield break;
+        if (line.voiceClip == null || isSkipped) yield break;
 
         // 오디오 시작 오프셋 적용
         if (line.audioStartOffset > 0)
             yield return new WaitForSeconds(line.audioStartOffset);
+
+        if (isSkipped) yield break;
 
         if (voiceAudioSource != null)
         {
@@ -191,8 +270,13 @@ public class DialogueManager : MonoBehaviour
 
             // 실제 오디오 완료까지 정확히 대기
             float audioLength = line.voiceClip.length;
-            yield return new WaitForSeconds(audioLength);
+            float elapsed = 0f;
 
+            while (elapsed < audioLength && !isSkipped)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
             isAudioPlaying = false;
 
             // 오디오 완료 이벤트 발생
@@ -202,7 +286,7 @@ public class DialogueManager : MonoBehaviour
 
     private IEnumerator TypeTextSynced(DialogueLine line)
     {
-        if (dialogueText == null) yield break;
+        if (dialogueText == null || isSkipped) yield break;
 
         isTyping = true;
         dialogueText.text = "";
@@ -223,7 +307,7 @@ public class DialogueManager : MonoBehaviour
 
         for (int i = 0; i <= line.text.Length; i++)
         {
-            if (!isTyping) break;
+            if (!isTyping || isSkipped) break;
 
             dialogueText.text = line.text.Substring(0, i);
             yield return new WaitForSeconds(actualTypingSpeed);
@@ -245,6 +329,11 @@ public class DialogueManager : MonoBehaviour
         isPlaying = false;
         isTyping = false;
         isAudioPlaying = false;
+
+        if (skipButton != null)
+        {
+            skipButton.gameObject.SetActive(false);
+        }
 
         OnDialogueComplete?.Invoke();
     }
