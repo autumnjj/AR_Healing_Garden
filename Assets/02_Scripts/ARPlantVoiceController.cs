@@ -3,6 +3,8 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
 using System.Collections;
+using UnityEngine.UIElements;
+
 
 #if UNITY_ANDROID
 using UnityEngine.Android;
@@ -11,28 +13,51 @@ using UnityEngine.Android;
 public class ARPlantVoiceController : MonoBehaviour
 {
     [Header("UI")]
-    public Button voiceButton;
+    public UnityEngine.UI.Button voiceButton;
     public TextMeshProUGUI targetText;
     public TextMeshProUGUI messageText;
+    private UnityEngine.UI.Image buttonImage;
 
-    private Image buttonImage;
+    [Header("Recognition Settings")]
+    [SerializeField] private bool useSpeechRecognition = true;
+    [SerializeField] private int maxSpeechAttempts = 3;
+    [SerializeField] private float speechTimeout = 4f;
+    [SerializeField] private float standardGrowthPoints = 15f;
 
-    [Header("목표 문장들")]
-    public List<string> positiveTargets = new List<string>
+    [Header("Volume Detection Settings (FallBack)")]
+    [SerializeField] private float volumeThreshold = 0.01f;
+    [SerializeField] private float minSpeakTime = 0.5f;
+    [SerializeField] private float recordingTime = 3f;
+
+    [Header("User Messages")]
+    public string[] encouragementMessages =
     {
-        "힘내", "잘하고 있어", "할 수 있어", "있는 그대로도 완벽해", "대단해",
-        "최고야", "예쁘다"
+        "잘 안들렸어요. 다시 말해보세요!",
+        "좀 더 또렷하게 말해보세요!",
+        "더 크게 말해보세요!"
+    };
+    public string[] successMessages =
+    {
+        "훌륭해요! 식물이 기뻐해요!",
+        "잘했어요! 식물이 자라고 있어요!",
+        "완벽해요! 식물이 사랑을 느꼈어요!"
     };
 
-    [Header("음성 설정")]
-    public float recordingTime = 3f;
-    public float volumeThreshold = 0.01f;
-    public float minSpeakTime = 0.5f;
+    [Header("긍정 문장들")]
+    public List<PositiveKeyword> positiveKeywords = new List<PositiveKeyword>();
 
-    // 상태 관리
-    private bool isRecording = false;
+    [System.Serializable]
+    public class PositiveKeyword
+    {
+        public string keyword;
+        public List<string> variations = new List<string>();
+    }
+
+    // 현재 상태
     private int currentTargetIndex = 0;
     private List<int> remainingTargets = new List<int>();
+    private int currentAttemptCount = 0;
+    private bool isRecognizing = false;
 
     // 마이크 관련
     private AudioClip microphoneClip;
@@ -41,51 +66,102 @@ public class ARPlantVoiceController : MonoBehaviour
     private float currentVolume = 0f;
     private float speakingTime = 0f;
 
+    // Android Speech Recognition
+    private AndroidJavaObject speechRecognizer;
+    private AndroidJavaObject unityActivity;
+
+    // 통계(백그라운드 수집)
+    private Dictionary<string, int> speechSuccessCount = new Dictionary<string, int>();
+    private Dictionary<string, int> totalAttemptCount = new Dictionary<string, int>();
+
     // 이벤트
-    public System.Action<string> OnVoiceRecognitionSuccess;
+    public System.Action<string, float, string> OnRecognitionSuccess;
 
     private void Start()
     {
-        SetupButtonComponents();
+        SetupKeywords();
+        InitializeComponents();
         InitializeTargets();
         ShowCurrentTarget();
 
-        // 마이크 권한 확인
-        StartCoroutine(CheckMicrophonePermission());
+        StartCoroutine(CheckPermission());
     }
 
-    private void SetupButtonComponents()
+    private void SetupKeywords()
+    {
+        positiveKeywords = new List<PositiveKeyword>()
+        {
+            new PositiveKeyword
+            {
+                keyword = "사랑해",
+                variations = new List<string> {"사랑한다", "사랑해요", "럽유"}
+                
+            },
+            new PositiveKeyword
+            {
+                keyword = "예쁘다",
+                variations = new List<string> {"예쁘다", "예뻐요", "이뻐", "아름다워" }
+                
+            },
+            new PositiveKeyword
+            {
+                keyword = "잘하고 있어",
+                variations = new List<string> {"잘했어", "잘해", "잘했다", "좋아"}
+                
+            },
+            new PositiveKeyword
+            {
+                keyword = "힘내",
+                variations = new List<string> {"화이팅", "파이팅", "힘내요" }
+                
+            },
+            new PositiveKeyword
+            {
+                keyword = "고마워",
+                variations = new List<string> {"고맙다", "감사해", "감사합니다" }
+                
+            },
+            new PositiveKeyword
+            {
+                keyword = "괜찮아",
+                variations = new List<string> { "괜찮다", "문제없어" }
+                
+            },
+            new PositiveKeyword
+            {
+                keyword = "대단해",
+                variations = new List<string> { "대단하다", "훌륭해", "멋져" }
+                
+            }
+        };
+
+        // 통계 초기화
+        foreach (var keyword in positiveKeywords)
+        {
+            speechSuccessCount[keyword.keyword] = 0;
+            totalAttemptCount[keyword.keyword] = 0;
+        }
+    }
+
+    private void InitializeComponents()
     {
         if (voiceButton != null)
         {
-            voiceButton.onClick.AddListener(StartVoiceRecording);
-            buttonImage = voiceButton.GetComponent<Image>();
-
-            if (buttonImage == null)
-            {
-                Debug.LogError("voiceButton에 Image 컴포넌트가 없습니다!");
-            }
-            else
-            {
-                Debug.Log("Button Image component found successfully");
-            }
+            voiceButton.onClick.AddListener(StartRecognition);
         }
-        else
-        {
-            Debug.LogError("voiceButton이 할당되지 않았습니다!");
-        }
+#if UNITY_ANDROID && !Unity_Editor
+        InitializeAndroidSpeechRecognizer();
+#endif
+        CheckMicrophoneDevices();
     }
 
-    private IEnumerator CheckMicrophonePermission()
+    private IEnumerator CheckPermission()
     {
-        Debug.Log("Checking microphone permission...");
-
 #if UNITY_ANDROID && !UNITY_EDITOR
         if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
         {
             Debug.Log("Requesting microphone permission...");
-            if (messageText != null)
-                messageText.text = "마이크 권한을 요청합니다...";
+            ShowMessage("마이크 접근 권한이 필요해요", Color.yellow);
                 
             Permission.RequestUserPermission(Permission.Microphone);
             
@@ -98,14 +174,12 @@ public class ARPlantVoiceController : MonoBehaviour
             
             if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
             {
-                Debug.LogError("마이크 권한이 거부되었습니다!");
-                if (messageText != null)
-                    messageText.text = "마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.";
+               ShowMessage("마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요", Color.red);
                 yield break;
             }
             else
             {
-                Debug.Log("마이크 권한이 허용되었습니다!");
+                ShowMessage("마이크 준비 완료! 식물과 대화해보세요."), Color.green);
             }
         }
 
@@ -113,20 +187,30 @@ public class ARPlantVoiceController : MonoBehaviour
 
         // 마이크 장치 확인
         CheckMicrophoneDevices();
-
-        if (messageText != null)
-            messageText.text = "마이크 준비 완료! 식물과 대화해보세요.";
-
         yield return null;
+    }
+
+
+    private void InitializeAndroidSpeechRecognizer()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            unityActivity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")
+                .GetStatic<AndroidJavaObject>("currentActivity");
+            Debug.Log("Android Speech Recognition 초기화 성공");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"Android Speech Recognition 초기화 실패: {e.Message}");
+            useSpeechRecognition = false; // 폴백
+        }
+    
+#endif
     }
 
     private void CheckMicrophoneDevices()
     {
-        for (int i = 0; i < Microphone.devices.Length; i++)
-        {
-            Debug.Log($"Microphone {i}: {Microphone.devices[i]}");
-        }
-
         if (Microphone.devices.Length > 0)
         {
             microphoneDevice = Microphone.devices[0];
@@ -135,16 +219,14 @@ public class ARPlantVoiceController : MonoBehaviour
         else
         {
             Debug.LogError("There is no Mic device");
-            if (messageText != null)
-                messageText.text = "마이크를 찾을 수 없습니다.";
+            useSpeechRecognition = false;
         }
     }
-
 
     private void InitializeTargets()
     {
         remainingTargets.Clear();
-        for (int i = 0; i < positiveTargets.Count; i++)
+        for (int i = 0; i < positiveKeywords.Count; i++)
             remainingTargets.Add(i);
 
         for (int i = 0; i < remainingTargets.Count; i++)
@@ -161,75 +243,151 @@ public class ARPlantVoiceController : MonoBehaviour
         if (remainingTargets.Count == 0)
         {
             // 모든 문장을 다 사용했으면 완료
-            OnAllTargetsComplete();
+            OnAllComplete();
             return;
         }
 
         // 현재 타겟 설정
         currentTargetIndex = remainingTargets[0];
+        currentAttemptCount = 0;
+
+        var currentKeyword = positiveKeywords[currentTargetIndex];
 
         if (targetText != null)
         {
-            targetText.text = $"따라 말해보세요:\n\"{positiveTargets[currentTargetIndex]}\"";
+           targetText.text = $"따라 말해보세요:\n\"{currentKeyword.keyword}\"";
         }
 
-        if (messageText != null)
-        {
-            string encouragementMessage = GetEncouragementMessage();
-            messageText.text = encouragementMessage;
-        }
+        ShowMessage("마이크 버튼을 눌러 말해보세요!", Color.white);
     }
 
 
-    private void StartVoiceRecording()
+    public void StartRecognition()
     {
-        if (isRecording)
+        if (!isRecognizing) return;
+
+        var currentKeyword = positiveKeywords[remainingTargets[0]];
+        totalAttemptCount[currentKeyword.keyword]++;
+
+        // 3번 시도했거나 음성인식을 사용하지 않는 경우 -> 발화 감지
+        if (currentAttemptCount >= maxSpeechAttempts || !useSpeechRecognition)
         {
-            StopVoiceRecording();
-            return;
+            StartCoroutine(VolumeDetectionMode(currentKeyword));
+        }
+        else
+        {
+            StartCoroutine(SpeechRecognitionMode(currentKeyword));
+        }
+    }
+
+    private IEnumerator SpeechRecognitionMode(PositiveKeyword targetKeyword)
+    {
+        isRecognizing = true;
+        currentAttemptCount++;
+
+        ShowMessage("듣고 있어요...", Color.green);
+        ChangeButtonColor(Color.green);
+
+        // 기본값으로 실패 처리
+        string recognizedText = "";
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Android 실기기에서만 실제 음성 인식
+        yield return StartCoroutine(AndroidSpeechRecognitionCoroutine((result) => recognizedText = result));
+#else
+        // 에디터에서는 간단히 대기만 하고 실패 처리
+        yield return new WaitForSeconds(speechTimeout);
+        Debug.Log("[VoiceRecognizer] 에디터 모드 - 음성 인식 스킵");
+#endif
+
+        if (IsKeywordMatched(recognizedText, targetKeyword))
+        {
+            // 음성 인식 성공!
+            speechSuccessCount[targetKeyword.keyword]++;
+            OnSuccess(targetKeyword, "speech");
+        }
+        else
+        {
+            // 실패 - 자연스럽게 재시도 유도
+            OnSpeechRecognitionFailed();
         }
 
-        if (Microphone.devices.Length == 0)
+        ChangeButtonColor(Color.white);
+        isRecognizing = false;
+    }
+
+    private IEnumerator VolumeDetectionMode(PositiveKeyword targetKeyword)
+    {
+        isRecognizing = true;
+
+        ShowMessage("목소리를 듣고 있어요...", Color.green);
+        ChangeButtonColor(Color.green);
+
+        bool volumeSuccess = false;
+        yield return StartCoroutine(VolumeDetectionCoroutine((result) => volumeSuccess = result));
+
+        if (volumeSuccess)
         {
-            if (messageText != null)
-                messageText.text = "마이크를 찾을 수 없습니다.";
-            return;
+            OnSuccess(targetKeyword, "volume");
+        }
+        else
+        {
+            ShowMessage("조금 더 크게 말해보세요!", Color.orange);
         }
 
-        StartCoroutine(RecordVoice());
+        ChangeButtonColor(Color.white);
+        isRecognizing = false;
     }
 
 
-    private IEnumerator RecordVoice()
+#if UNITY_ANDROID && !UNITY_EDITOR
+    private IEnumerator AndroidSpeechRecognitionCoroutine(System.Action<string> callback)
     {
-        isRecording = true;
+        try
+        {
+            AndroidJavaObject intent = new AndroidJavaObject("android.content.Intent", 
+                "android.speech.action.RECOGNIZE_SPEECH");
+            
+            intent.Call<AndroidJavaObject>("putExtra", 
+                "android.speech.extra.LANGUAGE_MODEL", "free_form");
+            intent.Call<AndroidJavaObject>("putExtra", 
+                "android.speech.extra.LANGUAGE", "ko-KR");
+            intent.Call<AndroidJavaObject>("putExtra", 
+                "android.speech.extra.PARTIAL_RESULTS", true);
+
+            yield return new WaitForSeconds(speechTimeout);
+            
+            // 실제 구현에서는 콜백을 통해 결과를 받아야 합니다
+            // 임시로 빈 문자열 반환
+            callback("");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[VoiceRecognizer] 음성 인식 오류: {e.Message}");
+            callback("");
+        }
+    }
+#endif
+
+    private IEnumerator VolumeDetectionCoroutine(System.Action<bool> callback)
+    {
         speakingTime = 0f;
+        currentVolume = 0f;
 
-        if (buttonImage != null)
+        if (string.IsNullOrEmpty(microphoneDevice))
         {
-            Color recordingColor = new Color(90f / 255f, 139f / 255f, 90f / 255f, 1f);
-            buttonImage.color = recordingColor;
-        }
-
-        if (messageText != null)
-            messageText.text = "듣고 있어요!";
-
-        microphoneClip = Microphone.Start(microphoneDevice, false, (int)recordingTime, 44100);
-
-        if (microphoneClip == null)
-        {
-            Debug.LogError("Mic record start failed");
-            StopVoiceRecording();
+            callback(false);
             yield break;
         }
+
+        microphoneClip = Microphone.Start(microphoneDevice, false, (int)recordingTime, 44100);
 
         float recordingTimer = 0f;
         bool voiceDetected = false;
 
-        while(recordingTimer < recordingTime && isRecording)
+        while(recordingTimer < recordingTime)
         {
             recordingTimer += Time.deltaTime;
-
             CheckMicrophoneVolume();
 
             if (currentVolume > volumeThreshold)
@@ -240,35 +398,22 @@ public class ARPlantVoiceController : MonoBehaviour
 
             yield return null;
         }
+        Microphone.End(microphoneDevice);
 
-        StopVoiceRecording();
-
-        if (voiceDetected && speakingTime >= minSpeakTime)
-        {
-            OnVoiceSuccess();
-        }
-        else
-        {
-            OnVoiceFailed();
-        }
+        // 결과를 콜백으로 전달
+        bool result = voiceDetected && speakingTime >= minSpeakTime;
+        callback(result);
     }
 
     private void CheckMicrophoneVolume()
     {
-        if (microphoneClip == null || string.IsNullOrEmpty(microphoneDevice))
-        {
-            currentVolume = 0f;
-            return;
-        }
-
+        if (microphoneClip == null || string.IsNullOrEmpty(microphoneDevice)) return;
+       
         int micPosition = Microphone.GetPosition(microphoneDevice);
         if (micPosition <= 0) return;
 
-        // 오디오 데이터 가져오기
-        int sampleLength = 128;
-        samples = new float[sampleLength];
-
-        int startPosition = Mathf.Max(0, micPosition - sampleLength);
+        samples = new float[128];
+        int startPosition = Mathf.Max(0, micPosition - 128);
         microphoneClip.GetData(samples, startPosition);
 
         // RMS (Root Mean Square) 계산으로 볼륨 측정
@@ -280,118 +425,102 @@ public class ARPlantVoiceController : MonoBehaviour
         currentVolume = Mathf.Sqrt(sum / samples.Length);
     }
 
-    private void StopVoiceRecording()
+    private bool IsKeywordMatched(string recognizedText, PositiveKeyword targetKeyword)
     {
-        if (isRecording)
+        if (string.IsNullOrEmpty(recognizedText)) return false;
+
+        recognizedText = recognizedText.ToLower().Trim();
+
+        // 정학히 일치하거나 포함
+        if (recognizedText.Contains(targetKeyword.keyword.ToLower())) return true;
+
+        // 변형들과 매칭
+        foreach(var variation in targetKeyword.variations)
         {
-            Microphone.End(microphoneDevice);
-            isRecording = false;
+            if (recognizedText.Contains(variation.ToLower())) return true;
         }
 
-        if (buttonImage != null)
-            buttonImage.color = Color.white;
+        return false;
     }
 
-    private void OnVoiceSuccess()
+    private void OnSpeechRecognitionFailed()
     {
-        Debug.Log($"음성 인식 성공! 말한 시간: {speakingTime:F1}초, 최대 볼륨: {currentVolume:F3}");
+        string encouragement = encouragementMessages[Random.Range(0, encouragementMessages.Length)];
+        ShowMessage(encouragement, Color.orange);
 
-        if (messageText != null)
-            messageText.text = "잘했어요! 식물이 당신의 목소리를 들었어요!";
+        Debug.Log($"[VoiceRecognizer] Voice Rec Failed - Try {currentAttemptCount}/{maxSpeechAttempts}");
+
+        if (currentAttemptCount >= maxSpeechAttempts)
+        {
+            Debug.Log("[VoiceRecognizer] Next turn 발화 감지 mode");
+        }
+    }
+
+    private void OnSuccess(PositiveKeyword keyword, string method)
+    {
+        string successMessage = successMessages[Random.Range(0, successMessages.Length)];
+        ShowMessage(successMessage, Color.green);
+
+        Debug.Log($"[VoiceRecognizer] 성공! 키워드: {keyword.keyword}, 방법: {method}, 시도: {currentAttemptCount}");
 
         // 성공 이벤트 발생
-        OnVoiceRecognitionSuccess?.Invoke(positiveTargets[currentTargetIndex]);
+        OnRecognitionSuccess?.Invoke(keyword.keyword, standardGrowthPoints, method);
 
 
-        if (remainingTargets.Count > 0)
-            remainingTargets.RemoveAt(0);
-
+        // 다음 타겟으로
+        remainingTargets.RemoveAt(0);
         StartCoroutine(DelayedNextTarget());
     }
 
-    private void OnVoiceFailed()
+    private void ShowMessage(string message, Color color)
     {
-        Debug.Log($"음성 감지 실패. 말한 시간: {speakingTime:F1}초, 최대 볼륨: {currentVolume:F3}");
-
         if (messageText != null)
-            messageText.text = "더 크게 말해주세요!";
+        {
+            messageText.text = message;
+            messageText.color = color;
+        }
+    }
+
+    private void ChangeButtonColor(Color color)
+    {
+        if (voiceButton != null)
+        {
+            var buttonImageg = voiceButton.GetComponent<UnityEngine.UI.Image>();
+            if (buttonImageg != null)
+                buttonImage.color = color;  
+        }
     }
 
     private IEnumerator DelayedNextTarget()
     {
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(2f);
         ShowCurrentTarget();
     }
 
-    public void OnAllTargetsComplete()
+    public void OnAllComplete()
     {
         if (targetText != null)
             targetText.text = "모든 응원 완료!";
 
+        ShowMessage("축하해요! 식물이 당신의 사랑으로 가득 자랐어요!", Color.gold);
+
         if (voiceButton != null)
             voiceButton.interactable = false;
-
-        if (messageText != null)
-            messageText.text = "축하해요! 따뜻한 말로 식물이 잘 자라고 있어요!";
     }
 
-    // 격려 메시지 생성
-    private string GetEncouragementMessage()
+    public void SetSpeechRecognition(bool enabled)
     {
-        int completed = positiveTargets.Count - remainingTargets.Count;
-
-        string[] messages = {
-            "버튼을 눌러 말해보세요",
-            "식물이 기다리고 있어요",
-            "따뜻한 목소리로 말해주세요",
-            "마음을 담아 말해보세요",
-            "거의 다 왔어요!",
-            "마지막이에요!"
-        };
-
-        if (completed == 0)
-            return messages[0];
-        else if (completed >= positiveTargets.Count - 1)
-            return messages[5];
-        else if (completed >= positiveTargets.Count - 2)
-            return messages[4];
-        else
-            return messages[(completed - 1) % 3 + 1];
+        useSpeechRecognition = enabled;
     }
-
-    // 디버그용 설정 조정 메서드들
-    public void SetVolumeThreshold(float threshold)
-    {
-        volumeThreshold = threshold;
-        Debug.Log($"볼륨 임계값 변경: {threshold:F3}");
-    }
-
-    public void SetMinSpeakTime(float time)
-    {
-        minSpeakTime = time;
-        Debug.Log($"최소 말하기 시간 변경: {time:F1}초");
-    }
-    public int GetRemainingTargetsCount()
+    
+    public int GetRemainingCount()
     {
         return remainingTargets.Count;
-    }
-
-    public int GetCompletedTargetsCount()
-    {
-        return positiveTargets.Count - remainingTargets.Count;
     }
 
     public bool IsAllComplete()
     {
         return remainingTargets.Count == 0;
-    }
-
-    private void OnDestroy()
-    {
-        if (isRecording)
-        {
-            Microphone.End(microphoneDevice);
-        }
     }
 }
 

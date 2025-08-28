@@ -29,7 +29,18 @@ public class IntroUIManager : MonoBehaviour
 
     private void Start()
     {
+        EnsureMobileOptimization();
+
         SetupUI();
+    }
+
+    private void EnsureMobileOptimization()
+    {
+        Canvas mainCanvas = GetComponentInParent<Canvas>();
+        if (mainCanvas != null && mainCanvas.GetComponent<SafeAreaController>() == null)
+        {
+            mainCanvas.gameObject.AddComponent<SafeAreaController>();
+        }
     }
 
     private void SetupUI()
