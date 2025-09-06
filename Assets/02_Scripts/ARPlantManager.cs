@@ -245,17 +245,17 @@ public class ARPlantManager : MonoBehaviour
         if (voiceController != null)
         {
             voiceController.enabled = true;
-            voiceController.OnVoiceRecognitionSuccess += OnVoiceSuccess;
+            voiceController.OnRecognitionSuccess += OnVoiceSuccess;
         }
 
         UpdateInstruction("화면에 나오는 문장을 따라 말해보세요!");
 
     }
 
-    private void OnVoiceSuccess(string recognizedText)
+    private void OnVoiceSuccess(string keyword, float points, string method)
     {
         // 성장 포인트 추가
-        growthPoints += pointsPerVoiceSuccess;
+        growthPoints += points;
         growthPoints = Mathf.Clamp(growthPoints, 0f, maxGrowthPoints);
 
         if (imageEffects != null)
@@ -359,7 +359,7 @@ public class ARPlantManager : MonoBehaviour
     {
         UpdateInstruction($"{GetCurrentPlantName()}(이)가 완전히 피어났어요!\n 당신의 긍정적인 말이 기적을 만들었습니다!");
         if (voiceController != null)
-            voiceController.OnAllTargetsComplete();
+            voiceController.OnAllComplete();
 
         StartCoroutine(CelebrationEffect());
     }
@@ -453,7 +453,7 @@ public class ARPlantManager : MonoBehaviour
     {
         if (voiceController != null)
         {
-            voiceController.OnVoiceRecognitionSuccess -= OnVoiceSuccess;
+            voiceController.OnRecognitionSuccess -= OnVoiceSuccess;
         }
     }
 }
