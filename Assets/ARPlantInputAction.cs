@@ -93,18 +93,18 @@ public partial class @ARPlantInputAction: IInputActionCollection2, IDisposable
             ""actions"": [
                 {
                     ""name"": ""Touch"",
-                    ""type"": ""Button"",
+                    ""type"": ""Value"",
                     ""id"": ""99cabdd7-d041-4635-9ce2-8888ffbdeee8"",
-                    ""expectedControlType"": """",
+                    ""expectedControlType"": ""Vector2"",
                     ""processors"": """",
                     ""interactions"": """",
-                    ""initialStateCheck"": false
+                    ""initialStateCheck"": true
                 },
                 {
                     ""name"": ""TouchPosition"",
-                    ""type"": ""Value"",
+                    ""type"": ""Button"",
                     ""id"": ""fa4b7a22-75c0-457d-890b-d3bfb6be7d2d"",
-                    ""expectedControlType"": ""Vector2"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
@@ -123,7 +123,7 @@ public partial class @ARPlantInputAction: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""19b6132f-4b85-4a15-a821-73f7703cf396"",
-                    ""path"": ""<Touchscreen>/Press"",
+                    ""path"": ""<Touchscreen>/primaryTouch/position"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -134,7 +134,7 @@ public partial class @ARPlantInputAction: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""a83e9fd8-1e41-40fc-9f6f-2c6ec3ce2ac6"",
-                    ""path"": ""<Touchscreen>/primaryTouch/position"",
+                    ""path"": ""<Touchscreen>/Press"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",

@@ -1094,7 +1094,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b5f51d5f66c38341bffd438a23c0999, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  raycastManager: {fileID: 673208943}
+  anchorManager: {fileID: 673208948}
+  planeManager: {fileID: 673208944}
   arCamera: {fileID: 1491065966}
+  touchPositionAction: {fileID: 6280243301199346158, guid: 59c4b0ea7fa236e468928263da913ba6, type: 3}
+  touchPressAction: {fileID: 3366699932961424397, guid: 59c4b0ea7fa236e468928263da913ba6, type: 3}
   preplacedTable: {fileID: 386279541}
   plantSpawnPoint: {fileID: 1087042566}
   preplacedSeed: {fileID: 1974896376}
@@ -1112,6 +1117,7 @@ MonoBehaviour:
   lavenderBlooming: {fileID: 375288239523511991, guid: 9d480ea4bdcb1c54f8ef3464ea3d8fa9, type: 3}
   instructionText: {fileID: 4913998833590533110}
   voiceUI: {fileID: 6027087877023104412}
+  placementUI: {fileID: 582419614003402137}
   voiceController: {fileID: 303099664}
   imageEffects: {fileID: 1357010830}
   maxGrowthPoints: 100
@@ -1119,6 +1125,7 @@ MonoBehaviour:
   sproutThreshold: 45
   growingThreshold: 90
   bloomingThreshold: 100
+  plantScale: 1
   initialSetupDelay: 1
   pivotCenterOffset: 0.15
 --- !u!1 &430198416
@@ -1549,6 +1556,7 @@ GameObject:
   - component: {fileID: 673208945}
   - component: {fileID: 673208944}
   - component: {fileID: 673208943}
+  - component: {fileID: 673208948}
   m_Layer: 0
   m_Name: XR Origin (Mobile AR)
   m_TagString: Untagged
@@ -1588,7 +1596,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_PlanePrefab: {fileID: 0}
-  m_DetectionMode: -1
+  m_DetectionMode: 1
 --- !u!114 &673208945
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1635,6 +1643,22 @@ Transform:
   - {fileID: 1090267643}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &673208948
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 673208942}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 728ad7fae8e460a4ba41265c7308d757, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  <trackablesChanged>k__BackingField:
+    m_PersistentCalls:
+      m_Calls: []
+  m_AnchorPrefab: {fileID: 0}
 --- !u!1 &696392409
 GameObject:
   m_ObjectHideFlags: 0
