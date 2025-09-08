@@ -1,0 +1,157 @@
+using UnityEngine;
+using System.Collections.Generic;
+using UnityEngine.UI;
+using TMPro;
+using UnityEngine.SceneManagement;
+using System.Collections;
+
+public class MBTIDropdownUI : MonoBehaviour
+{
+    [Header("MBTI 입력 UI")]
+    public GameObject mbtiInputPanel;
+    public TMP_Dropdown mbtiDropdown;
+    public Button confirmButton;
+    public Button cancelButton;
+    public TextMeshProUGUI titleText;
+
+    [Header("Font")]
+    public TMP_FontAsset koreanFont;
+
+    // 이벤트
+    public System.Action<string> OnMBTIConfirmed;
+    public System.Action OnCancelled;
+
+    private List<string> mbtiOptions = new List<string>
+    {
+        "ENFP - 활발한 연예인", "ENFJ - 정의로운 사회운동가", "ENTP - 뜨거운 논쟁을 즐기는 변론가",
+        "ENTJ - 대담한 통솔자", "ESFP - 자유로운 영혼의 연예인", "ESFJ - 사교적인 외교관",
+        "ESTP - 모험을 즐기는 사업가", "ESTJ - 엄격한 관리자", "INFP - 열정적인 중재자",
+        "INFJ - 선의의 옹호자", "INTP - 논리적인 사색가", "INTJ - 용의주도한 전략가",
+        "ISFP - 호기심 많은 예술가", "ISFJ - 용감한 수호자", "ISTP - 만능 재주꾼", "ISTJ - 현실주의자"
+    };
+
+    private void Start()
+    {
+        SetupUI();
+        ConnectEvents();
+    }
+
+    private void SetupUI()
+    {
+        if (mbtiInputPanel != null)
+            mbtiInputPanel.SetActive(false);
+
+        if (titleText != null)
+            titleText.text = "당신의 MBTI를 선택해주세요";
+        SetupDropdown();
+    }
+
+    private void SetupDropdown()
+    {
+        if (mbtiDropdown == null) return;
+
+        mbtiDropdown.ClearOptions();
+
+        List<string> dropdownOptions = new List<string> { "MBTI를 선택해주세요" };
+        dropdownOptions.AddRange(mbtiOptions);
+
+        mbtiDropdown.AddOptions(dropdownOptions);
+
+        mbtiDropdown.value = 0;
+        mbtiDropdown.RefreshShownValue();
+    }
+
+    private void ConnectEvents()
+    {
+        if (confirmButton != null)
+            confirmButton.onClick.AddListener(OnConfirm);
+
+        if (cancelButton != null)
+            cancelButton.onClick.AddListener(OnCancel);
+
+        if (mbtiDropdown != null)
+            mbtiDropdown.onValueChanged.AddListener(OnDropdownChanged);
+    }
+
+    private void OnDropdownChanged(int index)
+    {
+        if (confirmButton != null)
+        {
+            confirmButton.interactable = index > 0;
+        }
+
+        Debug.Log($"Selected: {(index > 0 ? mbtiOptions[index - 1] : "None")}");
+    }
+
+    private void OnConfirm()
+    {
+        int selectedIndex = mbtiDropdown.value;
+
+        if (selectedIndex <= 0)
+        {
+            ShowWarning("MBTI를 선택해주세요!");
+            return;
+        }
+
+        string mbtiCode = ExtractMBTICode(mbtiOptions[selectedIndex - 1]);
+        OnMBTIConfirmed?.Invoke(mbtiCode);
+
+        Debug.Log($"Confirmed MBTI : {mbtiCode}");
+
+        HidePanel();
+    }
+
+    private void OnCancel()
+    {
+        HidePanel();
+        OnCancelled?.Invoke();
+    }
+
+    private string ExtractMBTICode(string optionText)
+    {
+        return optionText.Split(' ')[0];
+    }
+
+    private void ShowWarning(string message)
+    {
+        if (titleText != null)
+            StartCoroutine(ShowWarningCoroutine(message));
+    }
+
+    private IEnumerator ShowWarningCoroutine(string message)
+    {
+        string original = titleText.text;
+        Color originalColor = titleText.color;
+
+        titleText.text = message;
+        titleText.color = Color.red;
+
+        yield return new WaitForSeconds(2f);
+
+        titleText.text = original;
+        titleText.color = originalColor;
+    }
+
+    public void ShowPanel()
+    {
+        if (mbtiInputPanel != null) mbtiInputPanel.SetActive(true);
+
+        ResetDropdown();
+    }
+
+    public void HidePanel()
+    {
+        if (mbtiInputPanel != null) mbtiInputPanel.SetActive(false);
+    }
+
+    private void ResetDropdown()
+    {
+        if(mbtiDropdown != null)
+        {
+            mbtiDropdown.value = 0;
+            mbtiDropdown.RefreshShownValue();
+        }
+
+        if (confirmButton != null) confirmButton.interactable = false;
+    }
+}

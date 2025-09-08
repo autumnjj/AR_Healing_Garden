@@ -1,0 +1,43 @@
+using UnityEngine;
+
+public class SimpleMBTIBGM : MonoBehaviour
+{
+    [Header("BGM 설정")]
+    public AudioClip mbtiBackgroundMusic;
+
+    [Header("볼륨 설정")]
+    [Range(0f, 1f)]
+    public float bgmVolume = 0.2f;
+
+    private AudioSource audioSource;
+
+    private void Start()
+    {
+        SetupBGM();
+        PlayBGM();
+    }
+
+    private void SetupBGM()
+    {
+        audioSource = gameObject.AddComponent<AudioSource>();
+
+        audioSource.clip = mbtiBackgroundMusic;
+        audioSource.volume = bgmVolume;
+        audioSource.loop = true;
+        audioSource.playOnAwake = false;
+    }
+
+    private void PlayBGM()
+    {
+        if (audioSource != null && mbtiBackgroundMusic != null)
+        {
+            audioSource.Play();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (audioSource != null && audioSource.isPlaying)
+            audioSource.Stop();
+    }
+}

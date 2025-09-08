@@ -38,11 +38,9 @@ public class MBTIDropdownUI : MonoBehaviour
 
     private void SetupUI()
     {
-        // 초기에는 패널 숨김
         if (mbtiInputPanel != null)
             mbtiInputPanel.SetActive(false);
 
-        // 제목 설정
         if (titleText != null)
             titleText.text = "당신의 MBTI를 선택해주세요";
         SetupDropdown();
@@ -52,60 +50,33 @@ public class MBTIDropdownUI : MonoBehaviour
     {
         if (mbtiDropdown == null) return;
 
-        // 드롭다운 초기화
         mbtiDropdown.ClearOptions();
 
-        // 첫 번째 옵션은 안내 메시지
         List<string> dropdownOptions = new List<string> { "MBTI를 선택해주세요" };
         dropdownOptions.AddRange(mbtiOptions);
 
         mbtiDropdown.AddOptions(dropdownOptions);
 
-        // 초기값 설정 (첫 번째 안내 메시지)
         mbtiDropdown.value = 0;
         mbtiDropdown.RefreshShownValue();
-
-        // 드롭다운 스타일 설정
-        //SetupDropdownStyle();
-    }
-
-    private void SetupDropdownStyle()
-    {
-        if (mbtiDropdown == null) return;
-
-        // 드롭다운 크기 및 스타일 설정
-        var rect = mbtiDropdown.GetComponent<RectTransform>();
-        if (rect != null)
-            rect.sizeDelta = new Vector2(400, 60);
-
-        // 텍스트 크기 설정
-        if (mbtiDropdown.captionText != null)
-            mbtiDropdown.captionText.fontSize = 18;
-
-        if (mbtiDropdown.itemText != null)
-            mbtiDropdown.itemText.fontSize = 16;
     }
 
     private void ConnectEvents()
     {
-        // 버튼 이벤트 연결
         if (confirmButton != null)
             confirmButton.onClick.AddListener(OnConfirm);
 
         if (cancelButton != null)
             cancelButton.onClick.AddListener(OnCancel);
 
-        // 드롭다운 값 변경 이벤트
         if (mbtiDropdown != null)
             mbtiDropdown.onValueChanged.AddListener(OnDropdownChanged);
     }
 
     private void OnDropdownChanged(int index)
     {
-        // 확인 버튼 활성화/비활성화
         if (confirmButton != null)
         {
-            // 첫 번째 옵션(안내 메시지)이 아닌 경우에만 활성화
             confirmButton.interactable = index > 0;
         }
 
@@ -116,7 +87,6 @@ public class MBTIDropdownUI : MonoBehaviour
     {
         int selectedIndex = mbtiDropdown.value;
 
-        // 첫 번째 옵션(안내 메시지)이 선택된 경우
         if (selectedIndex <= 0)
         {
             ShowWarning("MBTI를 선택해주세요!");
@@ -162,8 +132,6 @@ public class MBTIDropdownUI : MonoBehaviour
         titleText.color = originalColor;
     }
 
-
-    // 공개 메서드들
     public void ShowPanel()
     {
         if (mbtiInputPanel != null) mbtiInputPanel.SetActive(true);
@@ -184,7 +152,6 @@ public class MBTIDropdownUI : MonoBehaviour
             mbtiDropdown.RefreshShownValue();
         }
 
-        // 확인 버튼 비활성화
         if (confirmButton != null) confirmButton.interactable = false;
     }
 }
