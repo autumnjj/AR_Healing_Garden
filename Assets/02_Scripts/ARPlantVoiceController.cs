@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Collections;
 using System;
 
-
 #if UNITY_ANDROID
 using UnityEngine.Android;
 #endif
@@ -13,13 +12,13 @@ using UnityEngine.Android;
 public class ARPlantVoiceController : MonoBehaviour
 {
     [Header("UI")]
-    public Button voiceButton;
+    public UnityEngine.UI.Button voiceButton;
     public TextMeshProUGUI targetText;
     public TextMeshProUGUI messageText;
-    private Image buttonImage;
+    private UnityEngine.UI.Image buttonImage;
 
-    [Header("시연용 버튼들")]
-    public Button progressButton;
+    [Header("진행 버튼")]
+    public Button progressButton;  // 동적으로 변경되는 진행 버튼
 
     [Header("3일 시스템 설정")]
     [SerializeField] private int dailyTargetCount = 3;
@@ -32,7 +31,7 @@ public class ARPlantVoiceController : MonoBehaviour
     [SerializeField] private float speechTimeout = 4f;
     [SerializeField] private float standardGrowthPoints = 15f;
 
-    [Header("Volume Detection Settings (FallBack)")]
+    [Header("Volume Detection Settings")]
     [SerializeField] private float volumeThreshold = 0.01f;
     [SerializeField] private float minSpeakTime = 0.5f;
     [SerializeField] private float recordingTime = 3f;
@@ -78,13 +77,14 @@ public class ARPlantVoiceController : MonoBehaviour
     private AndroidJavaObject speechRecognizer;
     private AndroidJavaObject unityActivity;
 
-    // 통계(백그라운드 수집)
+    // 통계
     private Dictionary<string, int> speechSuccessCount = new Dictionary<string, int>();
     private Dictionary<string, int> totalAttemptCount = new Dictionary<string, int>();
 
     // 이벤트
     public System.Action<string, float, string> OnRecognitionSuccess;
 
+    // 캘린더 연동
     private CalendarManager calendarManager;
 
     private void Start()
@@ -92,16 +92,15 @@ public class ARPlantVoiceController : MonoBehaviour
         calendarManager = FindAnyObjectByType<CalendarManager>();
 
         InitializeThreeDaySystem();
-
         SetupKeywords();
         InitializeComponents();
-        SetupProgressButtons();
+        SetupProgressButton();
         ShowCurrentTarget();
 
         StartCoroutine(CheckPermission());
     }
 
-    private void SetupProgressButtons()
+    private void SetupProgressButton()
     {
         UpdateProgressButton();
     }
@@ -119,13 +118,12 @@ public class ARPlantVoiceController : MonoBehaviour
                 {
                     progressButton.gameObject.SetActive(true);
                     progressButton.interactable = true;
-                    if (buttonText) buttonText.text = "시작";
+                    if (buttonText) buttonText.text = "Day 2 시작 🌿";
 
-                    // 기존 리스너 제거하고 Day 2 시작 리스너 추가
                     progressButton.onClick.RemoveAllListeners();
                     progressButton.onClick.AddListener(() => StartNextDay(2));
 
-                    SetButtonAlpha(progressButton, 1f);
+                    Debug.Log("Day 1 완료 - Day 2 버튼 활성화");
                 }
                 else
                 {
@@ -138,12 +136,12 @@ public class ARPlantVoiceController : MonoBehaviour
                 {
                     progressButton.gameObject.SetActive(true);
                     progressButton.interactable = true;
-                    if (buttonText) buttonText.text = "시작";
+                    if (buttonText) buttonText.text = "Day 3 시작 🌸";
 
                     progressButton.onClick.RemoveAllListeners();
                     progressButton.onClick.AddListener(() => StartNextDay(3));
 
-                    SetButtonAlpha(progressButton, 1f);
+                    Debug.Log("Day 2 완료 - Day 3 버튼 활성화");
                 }
                 else
                 {
@@ -156,12 +154,12 @@ public class ARPlantVoiceController : MonoBehaviour
                 {
                     progressButton.gameObject.SetActive(true);
                     progressButton.interactable = true;
-                    if (buttonText) buttonText.text = "새 식물 시작";
+                    if (buttonText) buttonText.text = "새 식물 시작 🌱";
 
                     progressButton.onClick.RemoveAllListeners();
                     progressButton.onClick.AddListener(StartNewPlant);
 
-                    SetButtonAlpha(progressButton, 1f);
+                    Debug.Log("Day 3 완료 - 새 식물 버튼 활성화");
                 }
                 else
                 {
@@ -180,44 +178,8 @@ public class ARPlantVoiceController : MonoBehaviour
         PlayerPrefs.SetInt("Day_Completed", 0);
         PlayerPrefs.Save();
 
-        // 식물 성장 컨트롤러에 알림
         NotifyPlantGrowthController(day);
 
-        // UI 업데이트
-        InitializeDailyTargets();
-        ShowCurrentTarget();
-        UpdateProgressButton();  
-
-        // 음성 버튼 다시 활성화
-        if (voiceButton != null)
-            voiceButton.interactable = true;
-
-        string message = GetDayStartMessage(day);
-        ShowMessage(message, Color.green);
-    }
-
-    private void StartNewPlant()
-    {
-        // 새로운 시작 날짜 설정
-        PlayerPrefs.SetString("First_Play_Date", DateTime.Now.ToString("yyyy-MM-dd"));
-
-        // 3일 시스템 리셋
-        PlayerPrefs.DeleteKey("Plant_CurrentDay");
-        PlayerPrefs.DeleteKey("Day_Completed");
-        PlayerPrefs.Save();
-
-        // 상태 초기화
-        currentDay = 1;
-        isDayCompleted = false;
-
-        // 식물 상태도 초기화
-        var plantController = FindAnyObjectByType<ARPlantGrowthController>();
-        if (plantController != null)
-        {
-            plantController.ResetGrowth();  // 식물을 Seed 상태로 리셋
-        }
-
-        // UI 업데이트
         InitializeDailyTargets();
         ShowCurrentTarget();
         UpdateProgressButton();
@@ -225,7 +187,36 @@ public class ARPlantVoiceController : MonoBehaviour
         if (voiceButton != null)
             voiceButton.interactable = true;
 
-        ShowMessage("새로운 식물과 함께 새로운 여정을 시작해요!", Color.green);
+        string message = GetDayStartMessage(day);
+        ShowMessage(message, Color.green);
+
+        Debug.Log($"Day {currentDay} 시작!");
+    }
+
+    private void StartNewPlant()
+    {
+        PlayerPrefs.SetString("First_Play_Date", DateTime.Now.ToString("yyyy-MM-dd"));
+        PlayerPrefs.DeleteKey("Plant_CurrentDay");
+        PlayerPrefs.DeleteKey("Day_Completed");
+        PlayerPrefs.Save();
+
+        currentDay = 1;
+        isDayCompleted = false;
+
+        var plantController = FindAnyObjectByType<ARPlantGrowthController>();
+        if (plantController != null)
+        {
+            plantController.ResetGrowth();
+        }
+
+        InitializeDailyTargets();
+        ShowCurrentTarget();
+        UpdateProgressButton();
+
+        if (voiceButton != null)
+            voiceButton.interactable = true;
+
+        ShowMessage("새로운 식물과 함께 새로운 여정을 시작해요! 🌱", Color.green);
 
         Debug.Log("새 식물 시작 - 모든 데이터 리셋됨");
     }
@@ -235,33 +226,20 @@ public class ARPlantVoiceController : MonoBehaviour
         switch (day)
         {
             case 2:
-                return "어제의 새싹이 더 자라기를 기다려요";
+                return "Day 2 시작! 어제의 새싹이 더 자라기를 기다려요 🌿";
             case 3:
-                return "드디어 아름다운 꽃이 필 차례예요";
+                return "Day 3 시작! 드디어 아름다운 꽃이 필 차례예요 🌸";
             default:
-                return "식물과 대화해보세요";
+                return $"Day {day} 시작! 식물과 대화해보세요 🌱";
         }
     }
+
     private void NotifyPlantGrowthController(int day)
     {
         var plantController = FindAnyObjectByType<ARPlantGrowthController>();
         if (plantController != null)
         {
-            // 2일차: Sprout 상태로 시작
-            // 3일차: Growing 상태로 시작
             plantController.SetStartingStage(day);
-        }
-    }
-    private void SetButtonAlpha(Button button, float alpha)
-    {
-        if (button == null) return;
-
-        var image = button.GetComponent<Image>();
-        if (image != null)
-        {
-            Color color = image.color;
-            color.a = alpha;
-            image.color = color;
         }
     }
 
@@ -270,35 +248,39 @@ public class ARPlantVoiceController : MonoBehaviour
         currentDay = GetOrCreateCurrentDay();
         isDayCompleted = GetDayCompletedStatus();
 
+        Debug.Log($"3일 시스템 초기화: Day {currentDay}, Completed: {isDayCompleted}");
+
         InitializeDailyTargets();
     }
-
 
     private int GetOrCreateCurrentDay()
     {
         string today = DateTime.Now.ToString("yyyy-MM-dd");
         string lastDate = PlayerPrefs.GetString("Last_Play_Date", "");
 
-        if(lastDate != today)
+        if (lastDate != today)
         {
             int savedDay = PlayerPrefs.GetInt("Plant_CurrentDay", 1);
 
             if (lastDate != "" && savedDay < 3)
             {
                 savedDay++;
+                Debug.Log($"새로운 날: Day {savedDay}로 진행");
             }
-            else if(savedDay >= 3)
+            else if (savedDay >= 3)
             {
                 savedDay = 1;
+                Debug.Log("3일 완료 - 새로운 식물 시작");
             }
 
             PlayerPrefs.SetInt("Plant_CurrentDay", savedDay);
             PlayerPrefs.SetString("Last_Play_Date", today);
-            PlayerPrefs.SetInt("Today_Progress", 0);
+            PlayerPrefs.SetInt("Day_Completed", 0);
             PlayerPrefs.Save();
 
             return savedDay;
         }
+
         return PlayerPrefs.GetInt("Plant_CurrentDay", 1);
     }
 
@@ -312,12 +294,16 @@ public class ARPlantVoiceController : MonoBehaviour
         remainingTargets.Clear();
 
         if (isDayCompleted)
+        {
             return;
+        }
 
-        for(int i = 0; i < dailyTargetCount; i++)
+        for (int i = 0; i < dailyTargetCount; i++)
         {
             remainingTargets.Add(i % 3);
         }
+
+        Debug.Log($"Day {currentDay} 타겟 설정: {remainingTargets.Count}개");
     }
 
     private void SetupKeywords()
@@ -328,47 +314,19 @@ public class ARPlantVoiceController : MonoBehaviour
             {
                 keyword = "사랑해",
                 variations = new List<string> {"사랑한다", "사랑해요", "럽유"}
-                
             },
             new PositiveKeyword
             {
                 keyword = "예쁘다",
                 variations = new List<string> {"예쁘다", "예뻐요", "이뻐", "아름다워" }
-                
             },
             new PositiveKeyword
             {
                 keyword = "잘하고 있어",
                 variations = new List<string> {"잘했어", "잘해", "잘했다", "좋아"}
-                
-            },
-            new PositiveKeyword
-            {
-                keyword = "힘내",
-                variations = new List<string> {"화이팅", "파이팅", "힘내요" }
-                
-            },
-            new PositiveKeyword
-            {
-                keyword = "고마워",
-                variations = new List<string> {"고맙다", "감사해", "감사합니다" }
-                
-            },
-            new PositiveKeyword
-            {
-                keyword = "괜찮아",
-                variations = new List<string> { "괜찮다", "문제없어" }
-                
-            },
-            new PositiveKeyword
-            {
-                keyword = "대단해",
-                variations = new List<string> { "대단하다", "훌륭해", "멋져" }
-                
             }
         };
 
-        // 통계 초기화
         foreach (var keyword in positiveKeywords)
         {
             speechSuccessCount[keyword.keyword] = 0;
@@ -382,7 +340,7 @@ public class ARPlantVoiceController : MonoBehaviour
         {
             voiceButton.onClick.AddListener(StartRecognition);
         }
-#if UNITY_ANDROID && !Unity_Editor
+#if UNITY_ANDROID && !UNITY_EDITOR
         InitializeAndroidSpeechRecognizer();
 #endif
         CheckMicrophoneDevices();
@@ -412,17 +370,13 @@ public class ARPlantVoiceController : MonoBehaviour
             }
             else
             {
-                ShowMessage("마이크 준비 완료! 식물과 대화해보세요."), Color.green);
+                ShowMessage("마이크 준비 완료! 식물과 대화해보세요.", Color.green);
             }
         }
-
 #endif
-
-        // 마이크 장치 확인
         CheckMicrophoneDevices();
         yield return null;
     }
-
 
     private void InitializeAndroidSpeechRecognizer()
     {
@@ -436,9 +390,8 @@ public class ARPlantVoiceController : MonoBehaviour
         catch (System.Exception e)
         {
             Debug.LogError($"Android Speech Recognition 초기화 실패: {e.Message}");
-            useSpeechRecognition = false; // 폴백
+            useSpeechRecognition = false;
         }
-    
 #endif
     }
 
@@ -460,36 +413,36 @@ public class ARPlantVoiceController : MonoBehaviour
     {
         if (isDayCompleted)
         {
-            OnDayComplete();
+            OnDayCompleted();
             return;
         }
 
-        if(remainingTargets.Count == 0)
+        if (remainingTargets.Count == 0)
         {
-            OnDayComplete();
+            OnDayCompleted();
             return;
         }
-        // 현재 타겟 설정
+
         currentTargetIndex = remainingTargets[0];
         currentAttemptCount = 0;
 
         var currentKeyword = positiveKeywords[currentTargetIndex];
 
         if (targetText != null)
-            targetText.text = $"따라 말해보세요:\n\"{currentKeyword.keyword}\"";
+        {
+            targetText.text = $"Day {currentDay}\n\n따라 말해보세요:\n\"{currentKeyword.keyword}\"";
+        }
 
         ShowMessage("마이크 버튼을 눌러 말해보세요!", Color.white);
     }
 
-
     public void StartRecognition()
     {
-        if (!isRecognizing || isDayCompleted) return;
+        if (isRecognizing || isDayCompleted) return;
 
         var currentKeyword = positiveKeywords[remainingTargets[0]];
         totalAttemptCount[currentKeyword.keyword]++;
 
-        // 3번 시도했거나 음성인식을 사용하지 않는 경우 -> 발화 감지
         if (currentAttemptCount >= maxSpeechAttempts || !useSpeechRecognition)
         {
             StartCoroutine(VolumeDetectionMode(currentKeyword));
@@ -508,27 +461,22 @@ public class ARPlantVoiceController : MonoBehaviour
         ShowMessage("듣고 있어요...", Color.green);
         ChangeButtonColor(Color.green);
 
-        // 기본값으로 실패 처리
         string recognizedText = "";
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        // Android 실기기에서만 실제 음성 인식
         yield return StartCoroutine(AndroidSpeechRecognitionCoroutine((result) => recognizedText = result));
 #else
-        // 에디터에서는 간단히 대기만 하고 실패 처리
         yield return new WaitForSeconds(speechTimeout);
         Debug.Log("[VoiceRecognizer] 에디터 모드 - 음성 인식 스킵");
 #endif
 
         if (IsKeywordMatched(recognizedText, targetKeyword))
         {
-            // 음성 인식 성공!
             speechSuccessCount[targetKeyword.keyword]++;
             OnSuccess(targetKeyword, "speech");
         }
         else
         {
-            // 실패 - 자연스럽게 재시도 유도
             OnSpeechRecognitionFailed();
         }
 
@@ -559,10 +507,12 @@ public class ARPlantVoiceController : MonoBehaviour
         isRecognizing = false;
     }
 
-
 #if UNITY_ANDROID && !UNITY_EDITOR
     private IEnumerator AndroidSpeechRecognitionCoroutine(System.Action<string> callback)
     {
+        bool hasError = false;
+        
+        // try-catch를 yield return 밖에서 사용
         try
         {
             AndroidJavaObject intent = new AndroidJavaObject("android.content.Intent", 
@@ -574,22 +524,29 @@ public class ARPlantVoiceController : MonoBehaviour
                 "android.speech.extra.LANGUAGE", "ko-KR");
             intent.Call<AndroidJavaObject>("putExtra", 
                 "android.speech.extra.PARTIAL_RESULTS", true);
-
-            yield return new WaitForSeconds(speechTimeout);
-            
-            // 실제 구현에서는 콜백을 통해 결과를 받아야 합니다
-            // 임시로 빈 문자열 반환
-            callback("");
         }
         catch (System.Exception e)
         {
             Debug.LogError($"[VoiceRecognizer] 음성 인식 오류: {e.Message}");
+            hasError = true;
+        }
+        
+        // yield return은 try-catch 밖에서
+        yield return new WaitForSeconds(speechTimeout);
+        
+        // 결과 반환
+        if (hasError)
+        {
             callback("");
+        }
+        else
+        {
+            callback(""); // 실제 구현에서는 음성인식 결과 반환
         }
     }
 #endif
 
-    private IEnumerator VolumeDetectionCoroutine(Action<bool> callback)
+    private IEnumerator VolumeDetectionCoroutine(System.Action<bool> callback)
     {
         speakingTime = 0f;
         currentVolume = 0f;
@@ -605,7 +562,7 @@ public class ARPlantVoiceController : MonoBehaviour
         float recordingTimer = 0f;
         bool voiceDetected = false;
 
-        while(recordingTimer < recordingTime)
+        while (recordingTimer < recordingTime)
         {
             recordingTimer += Time.deltaTime;
             CheckMicrophoneVolume();
@@ -620,7 +577,6 @@ public class ARPlantVoiceController : MonoBehaviour
         }
         Microphone.End(microphoneDevice);
 
-        // 결과를 콜백으로 전달
         bool result = voiceDetected && speakingTime >= minSpeakTime;
         callback(result);
     }
@@ -628,7 +584,7 @@ public class ARPlantVoiceController : MonoBehaviour
     private void CheckMicrophoneVolume()
     {
         if (microphoneClip == null || string.IsNullOrEmpty(microphoneDevice)) return;
-       
+
         int micPosition = Microphone.GetPosition(microphoneDevice);
         if (micPosition <= 0) return;
 
@@ -636,7 +592,6 @@ public class ARPlantVoiceController : MonoBehaviour
         int startPosition = Mathf.Max(0, micPosition - 128);
         microphoneClip.GetData(samples, startPosition);
 
-        // RMS (Root Mean Square) 계산으로 볼륨 측정
         float sum = 0f;
         for (int i = 0; i < samples.Length; i++)
         {
@@ -651,11 +606,9 @@ public class ARPlantVoiceController : MonoBehaviour
 
         recognizedText = recognizedText.ToLower().Trim();
 
-        // 정학히 일치하거나 포함
         if (recognizedText.Contains(targetKeyword.keyword.ToLower())) return true;
 
-        // 변형들과 매칭
-        foreach(var variation in targetKeyword.variations)
+        foreach (var variation in targetKeyword.variations)
         {
             if (recognizedText.Contains(variation.ToLower())) return true;
         }
@@ -669,11 +622,6 @@ public class ARPlantVoiceController : MonoBehaviour
         ShowMessage(encouragement, Color.orange);
 
         Debug.Log($"[VoiceRecognizer] Voice Rec Failed - Try {currentAttemptCount}/{maxSpeechAttempts}");
-
-        if (currentAttemptCount >= maxSpeechAttempts)
-        {
-            Debug.Log("[VoiceRecognizer] Next turn 발화 감지 mode");
-        }
     }
 
     private void OnSuccess(PositiveKeyword keyword, string method)
@@ -683,10 +631,8 @@ public class ARPlantVoiceController : MonoBehaviour
 
         Debug.Log($"[VoiceRecognizer] 성공! 키워드: {keyword.keyword}, 방법: {method}, 시도: {currentAttemptCount}");
 
-        // 성공 이벤트 발생
         OnRecognitionSuccess?.Invoke(keyword.keyword, standardGrowthPoints, method);
 
-        // 다음 타겟으로
         remainingTargets.RemoveAt(0);
         StartCoroutine(DelayedNextTarget());
     }
@@ -704,9 +650,9 @@ public class ARPlantVoiceController : MonoBehaviour
     {
         if (voiceButton != null)
         {
-            var buttonImageg = voiceButton.GetComponent<UnityEngine.UI.Image>();
-            if (buttonImageg != null)
-                buttonImage.color = color;  
+            var buttonImage = voiceButton.GetComponent<UnityEngine.UI.Image>();
+            if (buttonImage != null)
+                buttonImage.color = color;
         }
     }
 
@@ -716,7 +662,7 @@ public class ARPlantVoiceController : MonoBehaviour
         ShowCurrentTarget();
     }
 
-    public void OnDayComplete()
+    public void OnDayCompleted()
     {
         isDayCompleted = true;
 
@@ -724,12 +670,14 @@ public class ARPlantVoiceController : MonoBehaviour
         PlayerPrefs.Save();
 
         if (calendarManager != null)
+        {
             calendarManager.RecordTodaySpeech();
+        }
 
         string message = GetDayCompletedMessage();
 
         if (targetText != null)
-            targetText.text = $"완료!";
+            targetText.text = $"Day {currentDay} 완료! 🎉";
 
         ShowMessage(message, Color.gold);
 
@@ -737,6 +685,8 @@ public class ARPlantVoiceController : MonoBehaviour
             voiceButton.interactable = false;
 
         UpdateProgressButton();
+
+        Debug.Log($"Day {currentDay} 완료! 진행 버튼 업데이트됨");
     }
 
     private string GetDayCompletedMessage()
@@ -744,15 +694,16 @@ public class ARPlantVoiceController : MonoBehaviour
         switch (currentDay)
         {
             case 1:
-                return "오늘 할당량 완료! 작은 새싹이 나왔어요.\n내일 다시 와서 식물을 키워보세요!";
+                return "오늘 할당량 완료! 작은 새싹이 나왔어요 🌱\nDay 2 버튼을 눌러 계속하세요!";
             case 2:
-                return "식물이 쑥쑥 자라고 있어요.\n내일이면 꽃이 필 거예요!";
+                return "2일차 완료! 식물이 쑥쑥 자라고 있어요 🌿\nDay 3 버튼을 눌러 마지막 단계로!";
             case 3:
-                return "축하해요! 아름다운 꽃이 피었어요.\n3일간의 여정을 완주했습니다!";
+                return "축하해요! 아름다운 꽃이 피었어요 🌸\n새 식물 버튼을 눌러 다시 시작해보세요!";
             default:
-                return "오늘 목표 달성! 내일 또 만나요!";
+                return "오늘 목표 달성! 🌱";
         }
     }
+
     public bool IsAllComplete()
     {
         return isDayCompleted || remainingTargets.Count == 0;
@@ -767,12 +718,11 @@ public class ARPlantVoiceController : MonoBehaviour
     {
         useSpeechRecognition = enabled;
     }
-    
+
     public int GetRemainingCount()
     {
         return remainingTargets.Count;
     }
 
+    
 }
-
-

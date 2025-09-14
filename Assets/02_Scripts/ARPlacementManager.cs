@@ -1,4 +1,4 @@
-using System.Collections;
+Ôªøusing System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using TMPro;
@@ -10,7 +10,10 @@ using UnityEngine.XR.ARSubsystems;
 
 public class ARPlacementManager : MonoBehaviour
 {
-    [Header("AR Foundation Components")]
+    [Header("Plant Prefabs")]
+    public GameObject seedPrefab;
+
+    [Header("AR Components")]
     public ARRaycastManager raycastManager;
     public ARAnchorManager anchorManager;
     public ARPlaneManager planeManager;
@@ -20,47 +23,45 @@ public class ARPlacementManager : MonoBehaviour
     public InputActionReference touchPositionAction;
     public InputActionReference touchPressAction;
 
-    [Header("Pre-placed Prefabs")]
-    public GameObject preplacedTable;
-    public Transform plantSpawnPoint;
-    public GameObject preplacedSeed;
+    [Header("Settings")]
+    public float plantScale = 0.5f;
+    public float plantYOffset = 0.02f;
+    public float fallbackDistance = 1.2f;
+    public float detectionTimeout = 8f;
 
     [Header("UI")]
     public TextMeshProUGUI instructionText;
     public GameObject voiceUI;
-    public GameObject placementUI;
+    public Button plantSeedButton;
 
-    [Header("AR Settings")]
-    public float plantScale = 1.0f;
-    public float initialSetupDelay = 1.0f;
-
-    private ARAnchor plantAnchor;
-    private List<ARRaycastHit> raycastHits = new List<ARRaycastHit>();
-    private bool isPlacementMode = true;
+    // ÏÉÅÌÉú
+    private bool isPlanted = false;
     private bool isCreatingAnchor = false;
+    private float detectionTimer = 0f;
 
-    // Input Action
-    private Vector2 touchPosition;
+    // AR Ïò§Î∏åÏ†ùÌä∏
+    private ARAnchor plantAnchor;
+    private GameObject currentPlant;
+    private Vector3 fixedLocalPosition;
 
-    private Vector3 seedOriginalPosition;  
-    private Quaternion seedOriginalRotation;
+    // Î†àÏù¥Ï∫êÏä§Ìä∏
+    private List<ARRaycastHit> raycastHits = new List<ARRaycastHit>();
 
-    private GameObject currentTableInstance;
-    private GameObject currentPlantInstance;
-
-    public bool IsPlaced { get; private set; } = false;
-
-    public System.Action OnPlacementComplete;
+    public System.Action OnSeedPlanted;
+    public bool IsPlanted => isPlanted;
 
     private void Start()
     {
-        SetupAR();
+        SetupComponents();
         SetupInputActions();
-        InitializeUI();
-        StartPlacementMode();
+        SetupUI();
+        StartPlantingFlow();
+
+        // Í≥†Ï†ï ÏúÑÏπò ÏÑ§Ï†ï
+        fixedLocalPosition = new Vector3(0, plantYOffset, 0);
     }
 
-    private void SetupAR()
+    private void SetupComponents()
     {
         if (arCamera == null)
             arCamera = Camera.main ?? FindAnyObjectByType<Camera>();
@@ -73,8 +74,6 @@ public class ARPlacementManager : MonoBehaviour
 
         if (planeManager == null)
             planeManager = FindAnyObjectByType<ARPlaneManager>();
-
-        Debug.Log("AR Foundation components initialized");
     }
 
     private void SetupInputActions()
@@ -86,97 +85,79 @@ public class ARPlacementManager : MonoBehaviour
         {
             touchPressAction.action.Enable();
             touchPressAction.action.started += OnTouchStarted;
-            touchPressAction.action.canceled += OnTouchEnded;
+        }
+    }
+
+    private void SetupUI()
+    {
+        if (voiceUI != null)
+            voiceUI.SetActive(false);
+
+        if (plantSeedButton != null)
+        {
+            plantSeedButton.onClick.AddListener(PlantSeedAtCenter);
+            plantSeedButton.gameObject.SetActive(false);
         }
     }
 
     private void OnTouchStarted(InputAction.CallbackContext context)
     {
-        if (isPlacementMode && !IsPlaced && !isCreatingAnchor)
+        if (isPlanted || isCreatingAnchor) return;
+
+        Vector2 touchPos = touchPositionAction.action.ReadValue<Vector2>();
+        _ = TryPlantAtTouch(touchPos);
+    }
+    private void StartPlantingFlow()
+    {
+        UpdateInstruction("ÌèâÎ©¥ÏùÑ Ï∞æÍ≥† ÏûàÏñ¥Ïöî...\nÎ∞îÎã•ÏùÑ ÎπÑÏ∂∞Ï£ºÏÑ∏Ïöî!");
+        StartCoroutine(PlantingDetectionRoutine());
+    }
+    private IEnumerator PlantingDetectionRoutine()
+    {
+        while (!isPlanted && detectionTimer < detectionTimeout)
         {
-            if (touchPositionAction != null)
+            detectionTimer += Time.deltaTime;
+
+            // 3Ï¥à ÌõÑ Ïî®Ïïó Ïã¨Í∏∞ Î≤ÑÌäº ÌëúÏãú
+            if (detectionTimer > 3f && plantSeedButton != null && !plantSeedButton.gameObject.activeInHierarchy)
             {
-                touchPosition = touchPositionAction.action.ReadValue<Vector2>();
-                _ = AttemptPlacementAsync();
+                plantSeedButton.gameObject.SetActive(true);
+                UpdateInstruction("ÌèâÎ©¥ÏùÑ ÌÑ∞ÏπòÌïòÍ±∞ÎÇò\n'ÌôîÎ∂Ñ Î∞∞Ïπò' Î≤ÑÌäºÏùÑ ÎàåÎü¨Ï£ºÏÑ∏Ïöî!");
             }
+
+            yield return new WaitForSeconds(0.5f);
         }
-    }
 
-    private void OnTouchEnded(InputAction.CallbackContext context)
-    {
-
-    }
-
-    private void InitializeUI()
-    {
-        if (voiceUI != null)
-            voiceUI.SetActive(false);
-
-        if (placementUI != null)
-            placementUI.SetActive(true);
-    }
-
-    private void StartPlacementMode()
-    {
-        isPlacementMode = true;
-        UpdateInstruction("ƒ´∏ﬁ∂Û∏¶ √µ√µ»˜ øÚ¡˜ø© πŸ¥⁄¿Ã≥™ ≈◊¿Ã∫Ì¿ª ∫Ò√Á¡÷ººø‰.\n" +
-            "∆Ú∏È¿Ã ∞®¡ˆµ«∏È ≈Õƒ°«ÿº≠ ≈◊¿Ã∫Ì¿ª πËƒ°«œººø‰!");
-    }
-    private void Update()
-    {
-        if (isPlacementMode && !IsPlaced)
-            CheckPlaneDetection();
-
-        if (touchPositionAction != null && touchPositionAction.action.enabled)
-            touchPosition = touchPositionAction.action.ReadValue<Vector2>();
-    }
-
-    private void CheckPlaneDetection()
-    {
-        // »≠∏È ¡ﬂæ”ø°º≠ ∆Ú∏È ∞®¡ˆ
-        Vector3 screenCenter = arCamera.ViewportToScreenPoint(new Vector3(0.5f, 0.5f, 0f));
-
-        if (raycastManager.Raycast(screenCenter, raycastHits, TrackableType.PlaneWithinPolygon))
+        // ÌÉÄÏûÑÏïÑÏõÉ Ïãú ÏûêÎèôÏúºÎ°ú Ïî®Ïïó Ïã¨Í∏∞
+        if (!isPlanted)
         {
-            // ∆Ú∏È¿Ã ∞®¡ˆµ«∏È πËƒ° ∞°¥… ∏ﬁΩ√¡ˆ
-            UpdateInstruction("∆Ú∏È¿Ã ∞®¡ˆµ«æ˙Ω¿¥œ¥Ÿ!\n≈Õƒ°«ÿº≠ Ωƒπ∞¿ª πËƒ°«œººø‰!");
-        }
-        else
-        {
-            UpdateInstruction("∆Ú∏È¿ª √£∞Ì ¿÷Ω¿¥œ¥Ÿ...\nƒ´∏ﬁ∂Û∏¶ √µ√µ»˜ øÚ¡˜ø© πŸ¥⁄¿Ã≥™ ≈◊¿Ã∫Ì¿ª ∫Ò√Á¡÷ººø‰!");
+            Debug.Log("Auto-planting seed due to timeout");
+            PlantSeedAtCenter();
         }
     }
 
-    private async Task AttemptPlacementAsync()
+    private async Task TryPlantAtTouch(Vector2 touchPosition)
     {
         if (isCreatingAnchor) return;
 
         isCreatingAnchor = true;
-        UpdateInstruction("Ωƒπ∞¿ª πËƒ°«œ¥¬ ¡ﬂ...");
+        UpdateInstruction("ÌôîÎ∂ÑÏùÑ Î∞∞Ïπò Ï§ë...");
 
         try
         {
             if (raycastManager.Raycast(touchPosition, raycastHits, TrackableType.PlaneWithinPolygon))
             {
-                await PlaceWithARAnchorAsync(raycastHits[0].pose);
+                await PlantSeedAtPose(raycastHits[0].pose);
             }
             else
             {
-                Vector3 screenCenter = arCamera.ViewportToScreenPoint(new Vector3(0.5f, 0.5f, 0f));
-                if (raycastManager.Raycast(screenCenter, raycastHits, TrackableType.PlaneWithinPolygon))
-                {
-                    await PlaceWithARAnchorAsync(raycastHits[0].pose);
-                }
-                else
-                {
-                    UpdateInstruction("∆Ú∏È¿ª √£¿ª ºˆ æ¯Ω¿¥œ¥Ÿ. πŸ¥⁄¿Ã≥™ ≈◊¿Ã∫Ì¿ª ¥ŸΩ√ ∫Ò√Á¡÷ººø‰!");
-                }
+                UpdateInstruction("ÌèâÎ©¥ÏùÑ Ï∞æÏùÑ Ïàò ÏóÜÏñ¥Ïöî. Îã§Ïãú ÌÑ∞ÏπòÌï¥Ï£ºÏÑ∏Ïöî!");
             }
         }
         catch (System.Exception ex)
         {
-            Debug.LogError($"Placement failed: {ex.Message}");
-            UpdateInstruction("πËƒ° ¡ﬂ ø¿∑˘∞° πﬂª˝«ﬂΩ¿¥œ¥Ÿ. ¥ŸΩ√ Ω√µµ«ÿ¡÷ººø‰.");
+            Debug.LogError($"Seed planting failed: {ex.Message}");
+            UpdateInstruction("Î∞∞Ïπò Ï§ë Ïò§Î•òÍ∞Ä Î∞úÏÉùÌñàÏñ¥Ïöî. Îã§Ïãú ÏãúÎèÑÌï¥Ï£ºÏÑ∏Ïöî.");
         }
         finally
         {
@@ -184,44 +165,99 @@ public class ARPlacementManager : MonoBehaviour
         }
     }
 
-    private async Task PlaceWithARAnchorAsync(Pose placementPose)
+    public void PlantSeedAtCenter()
     {
-        var result = await anchorManager.TryAddAnchorAsync(placementPose);
+        if (isPlanted) return;
 
-        if (!result.status.IsSuccess())
+        Debug.Log("Planting seed at center/fallback position");
+
+        Vector3 screenCenter = new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0);
+
+        // ÌôîÎ©¥ Ï§ëÏïôÏóêÏÑú ÌèâÎ©¥ Í∞êÏßÄ ÏãúÎèÑ
+        if (raycastManager.Raycast(screenCenter, raycastHits, TrackableType.PlaneWithinPolygon))
         {
-            UpdateInstruction("πËƒ° Ω«∆–! ¥ŸΩ√ Ω√µµ«ÿ¡÷ººø‰.");
+            _ = PlantSeedAtPose(raycastHits[0].pose);
+        }
+        else
+        {
+            // ÌèâÎ©¥ ÏóÜÏúºÎ©¥ Ïπ¥Î©îÎùº Ïïû Í≥†Ï†ï ÏúÑÏπòÏóê
+            Vector3 forwardDirection = arCamera.transform.forward;
+            forwardDirection.y = -0.5f;
+            forwardDirection.Normalize();
+
+            Vector3 placementPosition = arCamera.transform.position + forwardDirection * fallbackDistance;
+            placementPosition.y = arCamera.transform.position.y - 1f;
+
+            Pose fallbackPose = new Pose(placementPosition, Quaternion.identity);
+            _ = PlantSeedAtPose(fallbackPose);
+        }
+    }
+
+    private async Task PlantSeedAtPose(Pose pose)
+    {
+        if (isPlanted) return;
+
+        try
+        {
+            var result = await anchorManager.TryAddAnchorAsync(pose);
+
+            if (!result.status.IsSuccess())
+            {
+                PlantSeedWithoutAnchor(pose);
+                return;
+            }
+
+            plantAnchor = result.value;
+            CreateSeed(plantAnchor.transform);
+
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"Anchor creation failed: {ex.Message}, planting without anchor");
+            PlantSeedWithoutAnchor(pose);
+        }
+    }
+
+    private void PlantSeedWithoutAnchor(Pose pose)
+    {
+        GameObject anchorObject = new GameObject("SeedAnchor");
+        anchorObject.transform.position = pose.position;
+        anchorObject.transform.rotation = pose.rotation;
+
+        CreateSeed(anchorObject.transform);
+    }
+
+    private void CreateSeed(Transform parent)
+    {
+        if (seedPrefab == null)
+        {
+            Debug.LogError("Seed prefab is not assigned!");
             return;
         }
 
-        plantAnchor = result.value;
+        // Ïî®Ïïó ÏÉùÏÑ± (Ïî¨Ïóê ÎØ∏Î¶¨ Î∞∞Ïπò ÏïàÌñàÏùå!)
+        currentPlant = Instantiate(seedPrefab, parent);
+        currentPlant.transform.localPosition = fixedLocalPosition;
+        currentPlant.transform.localRotation = Quaternion.identity;
+        currentPlant.transform.localScale = Vector3.one * plantScale;
 
-        if (preplacedTable != null)
-        {
-            currentTableInstance = Instantiate(preplacedTable);
-            currentTableInstance.transform.SetParent(plantAnchor.transform, false);
-            currentTableInstance.transform.localPosition = Vector3.zero;
-            currentTableInstance.transform.localRotation = Quaternion.identity;
-            currentTableInstance.transform.localScale = Vector3.one * plantScale;
-        }
+        OnSeedPlantingSuccess();
 
-        if (preplacedSeed != null)
-        {
-            currentPlantInstance = Instantiate(preplacedSeed);
-            currentPlantInstance.transform.SetParent(plantAnchor.transform, false);
-            currentPlantInstance.transform.localPosition = Vector3.up * 0.1f;
-            currentPlantInstance.transform.localRotation = Quaternion.identity;
-            currentPlantInstance.transform.localScale = Vector3.one * plantScale;
-        }
-
-        OnPlacementCompleteInternal();
+        Debug.Log($"Seed created at local position: {fixedLocalPosition}");
     }
 
-    private void OnPlacementCompleteInternal()
+    private void OnSeedPlantingSuccess()
     {
-        IsPlaced = true;
-        isPlacementMode = false;
+        isPlanted = true;
 
+        // UI Ï†ïÎ¶¨
+        if (plantSeedButton != null)
+            plantSeedButton.gameObject.SetActive(false);
+
+        if (voiceUI != null)
+            voiceUI.SetActive(true);
+
+        // ÌèâÎ©¥ Í∞êÏßÄ ÎπÑÌôúÏÑ±Ìôî (ÏÑ±Îä• Ìñ•ÏÉÅ)
         if (planeManager != null)
         {
             planeManager.enabled = false;
@@ -229,78 +265,30 @@ public class ARPlacementManager : MonoBehaviour
                 plane.gameObject.SetActive(false);
         }
 
-        if (placementUI != null)
-            placementUI.SetActive(false);
+        UpdateInstruction("ÌôîÎ∂ÑÏù¥ Î∞∞ÏπòÎêòÏóàÏñ¥Ïöî!\nÌôîÎ©¥Ïùò Î¨∏Ïû•ÏùÑ Îî∞Îùº ÎßêÌï¥Î≥¥ÏÑ∏Ïöî!");
 
-        if (voiceUI != null)
-            voiceUI.SetActive(true);
-
-        UpdateInstruction("πËƒ° øœ∑·! »≠∏Èø° ≥™ø¿¥¬ πÆ¿Â¿ª µ˚∂Û ∏ª«ÿ∫∏ººø‰!");
-
-        OnPlacementComplete?.Invoke();
+        OnSeedPlanted?.Invoke();
     }
 
     public void ReplacePlant(GameObject newPlantPrefab)
     {
-        if (currentPlantInstance == null || plantAnchor == null || newPlantPrefab == null) return;
+        if (!isPlanted || newPlantPrefab == null || currentPlant == null) return;
 
-        Vector3 localPosition = currentPlantInstance.transform.transform.localPosition;
-        Vector3 localScale = currentPlantInstance.transform.localScale;
+        Transform parent = currentPlant.transform.parent;
 
-        Destroy(currentPlantInstance);
+        Debug.Log($"Replacing plant with {newPlantPrefab.name}");
+        Debug.Log($"Current plant position before replace: {currentPlant.transform.localPosition}");
 
-        currentPlantInstance = Instantiate(newPlantPrefab);
-        currentPlantInstance.transform.SetParent(plantAnchor.transform, false);
-        currentPlantInstance.transform.localPosition = localPosition;
-        currentPlantInstance.transform.localRotation = Quaternion.identity;
-        currentPlantInstance.transform.localScale = localScale;
+        // Í∏∞Ï°¥ ÏãùÎ¨º Ï†úÍ±∞
+        Destroy(currentPlant);
 
-        Debug.Log($"Plant replaced with {newPlantPrefab.name}");
-    }
+        // ÏÉà ÏãùÎ¨º ÏÉùÏÑ± - Í≥†Ï†ïÎêú Î°úÏª¨ ÏúÑÏπò ÏÇ¨Ïö©
+        currentPlant = Instantiate(newPlantPrefab, parent);
+        currentPlant.transform.localPosition = fixedLocalPosition;
+        currentPlant.transform.localRotation = Quaternion.identity;
+        currentPlant.transform.localScale = Vector3.one * plantScale;
 
-    public void ResetPlacement()
-    {
-        if (currentTableInstance != null)
-        {
-            Destroy(currentTableInstance);
-            currentTableInstance = null;
-        }
-
-        if (currentPlantInstance != null)
-        {
-            Destroy(currentPlantInstance);
-            currentPlantInstance = null;
-        }
-
-        if (plantAnchor != null)
-        {
-            try
-            {
-                if (anchorManager != null)
-                {
-                    bool removeSuccess = anchorManager.TryRemoveAnchor(plantAnchor);
-                    if (!removeSuccess)
-                        Debug.LogWarning($"Failed to remove anchor: {removeSuccess}");
-                }
-
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"Error removing anchor: {ex.Message}");
-            }
-            finally
-            {
-                plantAnchor = null;
-            }
-        }
-
-        IsPlaced = false;
-        isCreatingAnchor = false;
-
-        if (planeManager != null)
-            planeManager.enabled = true;
-
-        StartPlacementMode();
+        Debug.Log($"Plant replaced successfully at position: {currentPlant.transform.localPosition}");
     }
 
     private void UpdateInstruction(string message)
@@ -309,35 +297,30 @@ public class ARPlacementManager : MonoBehaviour
             instructionText.text = message;
     }
 
-    public GameObject GetCurrentPlant() => currentPlantInstance;
-    public Transform GetPlantAnchor() => plantAnchor?.transform;
+    // Í∏∞Ï°¥ ÏãúÏä§ÌÖúÍ≥ºÏùò Ìò∏ÌôòÏÑ±
+    public GameObject GetCurrentPlant() => currentPlant;
+    public Transform GetPlantAnchor() => plantAnchor?.transform ?? currentPlant?.transform.parent;
 
     private void OnDestroy()
     {
         if (touchPressAction != null && touchPressAction.action != null)
         {
             touchPressAction.action.started -= OnTouchStarted;
-            touchPressAction.action.canceled -= OnTouchEnded;
             touchPressAction.action.Disable();
         }
 
         if (touchPositionAction != null && touchPositionAction.action != null)
-        {
             touchPositionAction.action.Disable();
-        }
 
-        if (plantAnchor != null)
+        if (plantAnchor != null && anchorManager != null)
         {
             try
             {
-                if (anchorManager != null)
-                    anchorManager.TryRemoveAnchor(plantAnchor);
-                
-                Destroy(plantAnchor);
+                anchorManager.TryRemoveAnchor(plantAnchor);
             }
-            catch (System.Exception)
+            catch (System.Exception ex)
             {
-                Debug.LogError("Error removing anchor in OnDestroy");
+                Debug.LogError($"Error removing anchor: {ex.Message}");
             }
         }
     }

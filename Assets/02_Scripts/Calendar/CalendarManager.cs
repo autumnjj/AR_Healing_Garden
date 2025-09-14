@@ -128,43 +128,60 @@ public class CalendarManager : MonoBehaviour
             closeButton.onClick.AddListener(HideCalendar);
     }
 
-    public void RecordPlantCompletion()
+
+    // 음성 인식 완료 시 호출
+    public void RecordTodaySpeech()
     {
         string today = DateTime.Now.ToString("yyyy-MM-dd");
+        speechRecords[today] = dailyGoal; // 목표 달성으로 기록
 
-        // 식물 완성 = 목표 달성
-        speechRecords[today] = dailyGoal;
-
-        Debug.Log($"Plant Blooming! Today({today}) Goal reched record!");
+        Debug.Log($"Speech completed! Today({today}) recorded as goal achieved!");
 
         SaveCalendarData();
 
         // 현재 표시 중인 달이면 업데이트
         if (currentDisplayDate.Year == DateTime.Now.Year &&
-                currentDisplayDate.Month == DateTime.Now.Month)
-                UpdateCalendarDisplay();
-    }
-
-    // 오늘 대화했을 때 호출할 메서드
-    public void RecordTodaySpeech()
-    {
-        RecordPlantCompletion();
+            currentDisplayDate.Month == DateTime.Now.Month)
+        {
+            UpdateCalendarDisplay();
+        }
     }
 
     private void UpdateCalendarDisplay()
     {
-        // 기존 버튼들 제거
         ClearCalendarButtons();
+        SetupGridLayout();
+        UpdateMonthDisplay();
+        CreateCalendarDays();
+        UpdatePersonalizedMessage();
+    }
 
-        // 월/년 표시 업데이트
+    private void SetupGridLayout()
+    {
+        if (calendarGrid != null)
+        {
+            GridLayoutGroup gridLayout = calendarGrid.GetComponent<GridLayoutGroup>();
+            if (gridLayout == null)
+            {
+                gridLayout = calendarGrid.gameObject.AddComponent<GridLayoutGroup>();
+            }
+
+        }
+    }
+
+    private void UpdateMonthDisplay()
+    {
         if (monthYearText != null)
-            monthYearText.text = currentDisplayDate.ToString("MMMM", System.Globalization.CultureInfo.InvariantCulture);
+        {
+            string monthName = GetEnglishMonthName(currentDisplayDate.Month);
+            monthYearText.text = monthName;
+        }
+    }
 
-        // 해당 월의 첫날과 마지막날 구하기
+    private void CreateCalendarDays()
+    {
         DateTime firstDay = new DateTime(currentDisplayDate.Year, currentDisplayDate.Month, 1);
         DateTime lastDay = firstDay.AddMonths(1).AddDays(-1);
-
-        // 첫 주의 시작 요일 (일요일=0)
         int startDayOfWeek = (int)firstDay.DayOfWeek;
 
         // 빈 공간 생성 (이전 달 마지막 날들)
@@ -174,12 +191,10 @@ public class CalendarManager : MonoBehaviour
         }
 
         // 실제 날짜 버튼들 생성
-        for(int day = 1; day <= lastDay.Day; day++)
+        for (int day = 1; day <= lastDay.Day; day++)
         {
             CreateDayButton(day);
         }
-
-        UpdatePersonalizedMessage();
     }
 
     private void CreateDayButton(int day)
@@ -189,44 +204,67 @@ public class CalendarManager : MonoBehaviour
         GameObject dayBtn = Instantiate(dayButtonPrefab, calendarGrid);
         dayButtons.Add(dayBtn);
 
-        // 버튼 텍스트 설정
-        TextMeshProUGUI dayText = dayBtn.GetComponentInChildren<TextMeshProUGUI>();
-        Image flowerIcon = dayBtn.GetComponentInChildren<Image>();
-        if(dayText != null)
+        // 텍스트 컴포넌트 찾기 및 설정
+        SetupDayText(dayBtn, day);
+
+        // 꽃 아이콘 설정
+        SetupFlowerIcon(dayBtn, day);
+
+        // 오늘 날짜 강조
+        if (IsToday(day))
+        {
+            HighlightTodayButton(dayBtn);
+        }
+    }
+
+    private void SetupDayText(GameObject dayBtn, int day)
+    {
+        TextMeshProUGUI dayText = dayBtn.GetComponentInChildren<TextMeshProUGUI>(true);
+
+        if (dayText != null)
         {
             dayText.text = day.ToString();
-        }
-
-        // 해당 날짜의 대화 기록 확인
-        string dateKey = new DateTime(currentDisplayDate.Year, currentDisplayDate.Month, day).ToString("yyyy-MM-dd");
-        int speechCount = speechRecords.ContainsKey(dateKey) ? speechRecords[dateKey] : 0;
-
-        if(speechCount >= dailyGoal)
-        {
-            if (dayText != null)
-                dayText.gameObject.SetActive(false);
-
-            if (flowerIcon != null)
-                flowerIcon.gameObject.SetActive(true);
+            dayText.gameObject.SetActive(true);
         }
         else
         {
-            if (dayText != null)
-                dayText.gameObject.SetActive(true);
-            if (flowerIcon != null)
-                flowerIcon.gameObject.SetActive(false);
-        }
-
-        if (IsToday(day))
-        {
-            Outline outline = dayBtn.GetComponent<Outline>();
-            if(outline == null)
+            // 대안: 일반 Text 컴포넌트
+            UnityEngine.UI.Text fallbackText = dayBtn.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            if (fallbackText != null)
             {
-                outline = dayBtn.AddComponent<Outline>();
+                fallbackText.text = day.ToString();
+                fallbackText.gameObject.SetActive(true);
             }
-            outline.effectColor = Color.deepPink;
-            outline.effectDistance = new Vector2(3, 3);
         }
+    }
+
+    private void SetupFlowerIcon(GameObject dayBtn, int day)
+    {
+        // 날짜에 해당하는 기록 확인
+        string dateKey = new DateTime(currentDisplayDate.Year, currentDisplayDate.Month, day).ToString("yyyy-MM-dd");
+        int speechCount = speechRecords.ContainsKey(dateKey) ? speechRecords[dateKey] : 0;
+        bool goalAchieved = speechCount >= dailyGoal;
+
+        // 꽃 아이콘 찾기 (보통 두 번째 Image 컴포넌트)
+        Image[] images = dayBtn.GetComponentsInChildren<Image>(true);
+        Image flowerIcon = images.Length > 1 ? images[1] : null;
+
+        if (flowerIcon != null)
+        {
+            flowerIcon.gameObject.SetActive(goalAchieved); // 목표 달성했을 때만 표시
+        }
+    }
+
+
+    private void HighlightTodayButton(GameObject dayBtn)
+    {
+        Outline outline = dayBtn.GetComponent<Outline>();
+        if (outline == null)
+        {
+            outline = dayBtn.AddComponent<Outline>();
+        }
+        outline.effectColor = new Color(0f, 0.8f, 0f, 1f); // 진한 초록색
+        outline.effectDistance = new Vector2(4, 4);
     }
 
     private void CreateEmptyDayButton()
@@ -236,21 +274,21 @@ public class CalendarManager : MonoBehaviour
         GameObject emptyBtn = Instantiate(dayButtonPrefab, calendarGrid);
         dayButtons.Add(emptyBtn);
 
-        // 텍스트 제거
-        TextMeshProUGUI dayText = emptyBtn.GetComponentInChildren<TextMeshProUGUI>();
-        Image flowerIcon = emptyBtn.GetComponentInChildren<Image>();
-        if(dayText != null)
-        {
-            dayText.text = "";
-            dayText.gameObject.SetActive(false);
-        }
-        if(flowerIcon != null)
-            flowerIcon.gameObject .SetActive(false);
+        // 텍스트와 아이콘 모두 숨김
+        TextMeshProUGUI dayText = emptyBtn.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (dayText != null) dayText.gameObject.SetActive(false);
 
-        // 버튼 비활성화
+        Image[] images = emptyBtn.GetComponentsInChildren<Image>(true);
+        if (images.Length > 1) images[1].gameObject.SetActive(false); // 꽃 아이콘 숨김
+
+        // 버튼 비활성화 및 투명도 조절
         Button btn = emptyBtn.GetComponent<Button>();
-        if (btn != null)
-            btn.interactable = false;
+        if (btn != null) btn.interactable = false;
+
+        CanvasGroup canvasGroup = emptyBtn.GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = emptyBtn.AddComponent<CanvasGroup>();
+        canvasGroup.alpha = 0.3f;
+
     }
 
     private void UpdatePersonalizedMessage()
@@ -265,17 +303,24 @@ public class CalendarManager : MonoBehaviour
         }
         else
         {
-            personalizedMessageText.text = "당신의 식물이 당신을 응원하고 있어요!";
+            personalizedMessageText.text = "당신을 응원하고 있어요!";
         }
 
         if(todayStatusText != null)
         {
             int todayCount = GetTodaySpeechCount();
             if (todayCount >= dailyGoal)
-                todayStatusText.text = $"오늘 식물 완성! 목표 달성!";
+                todayStatusText.text = $"오늘 목표 달성!";
             else
-                todayStatusText.text = $"오늘 새로운 식물과 만나보세요!";
+                todayStatusText.text = $"오늘도 긍정적인 마음으로!";
         }
+    }
+
+    private string GetEnglishMonthName(int month)
+    {
+        string[] monthNames = { "", "January", "February", "March", "April", "May", "June",
+                               "July", "August", "September", "October", "November", "December" };
+        return month >= 1 && month <= 12 ? monthNames[month] : "Unknown";
     }
 
     private bool IsToday(int day)
@@ -344,13 +389,12 @@ public class CalendarManager : MonoBehaviour
 
             for(int i = 0; i < dates.Length && i < counts.Length; i++)
             {
-                if (int.TryParse(counts[i], out int count))
+                if (int.TryParse(counts[i], out int count) && !string.IsNullOrEmpty(dates[i]))
                     speechRecords[dates[i]] = count;
             }
         }
     }
 
-    // 외부에서 호출할 공용 메서드들
     public void ShowCalendar()
     {
         if (calendarPanel != null)

@@ -4,10 +4,8 @@ using System.Collections;
 
 public class ARPlantGrowthController : MonoBehaviour
 {
-    [Header("Pre-placed Prefabs")]
-    public GameObject preplacedTable;
-    public Transform plantSpawnPoint;
-    public GameObject preplacedSeed;
+    [Header("Plant Prefabs")]
+    public GameObject seedPrefab;
 
     [Header("Sunflower Prefabs")]
     public GameObject sunflowerSprout;
@@ -31,11 +29,11 @@ public class ARPlantGrowthController : MonoBehaviour
 
     [Header("Growth Settings")]
     [Range(50f, 200f)]
-    public float maxGrowthPoints = 100f;
+    public float maxGrowthPoints = 135f;
     public float pointsPerVoiceSuccess = 15f;
     public float sproutThreshold = 45f;
     public float growingThreshold = 90f;
-    public float bloomingThreshold = 100f;
+    public float bloomingThreshold = 135f;
 
     [Header("UI")]
     public TextMeshProUGUI instructionText;
@@ -64,6 +62,7 @@ public class ARPlantGrowthController : MonoBehaviour
         SetupReferences();
         SetupPlantType();
         ConnectEvents();
+        PrepareSeedForPlanting();
     }
 
     private void SetupReferences()
@@ -96,21 +95,48 @@ public class ARPlantGrowthController : MonoBehaviour
         }
     }
 
+    private void PrepareSeedForPlanting()
+    {
+        // AR 매니저에 사용할 씨앗 Prefab 설정
+        if (placementManager != null)
+        {
+            GameObject currentSeedPrefab = GetCurrentSeedPrefab();
+            if (currentSeedPrefab != null)
+            {
+                placementManager.seedPrefab = currentSeedPrefab;
+                Debug.Log($"Seed prefab set for planting: {currentSeedPrefab.name}");
+            }
+        }
+    }
+
+    private GameObject GetCurrentSeedPrefab()
+    {
+        // MBTI별 씨앗이 있으면 사용, 없으면 공통 씨앗 사용
+        if (seedPrefab != null)
+        {
+            return seedPrefab;
+        }
+
+        // 또는 첫 번째 성장 단계를 씨앗으로 사용할 수도 있음
+        Debug.LogWarning("No seed prefab assigned, using common seed");
+        return null;
+    }
+
     private void ConnectEvents()
     {
         if (placementManager != null)
-            placementManager.OnPlacementComplete += OnPlacementComplete;
+            placementManager.OnSeedPlanted += OnSeedPlanted;
 
         if (voiceController != null)
             voiceController.OnRecognitionSuccess += OnVoiceSuccess;
     }
 
-    private void OnPlacementComplete()
+    private void OnSeedPlanted()
     {
         if (voiceController != null)
             voiceController.enabled = true;
 
-        Debug.Log("Plant placement completed - voice recognition enabled");
+        Debug.Log("Seed planted - voice recognition enabled");
     }
 
     private void OnVoiceSuccess(string keyword, float points, string method)
@@ -128,7 +154,7 @@ public class ARPlantGrowthController : MonoBehaviour
 
     private void CheckGrowth()
     {
-        PlantGrowthStage newStage = PlantGrowthStage.Seed;
+        PlantGrowthStage newStage = PlantGrowthStage.Seed; // 기본값
 
         if (growthPoints >= bloomingThreshold)
             newStage = PlantGrowthStage.Blooming;
@@ -136,6 +162,7 @@ public class ARPlantGrowthController : MonoBehaviour
             newStage = PlantGrowthStage.Growing;
         else if (growthPoints >= sproutThreshold)
             newStage = PlantGrowthStage.Sprout;
+        // else Seed 상태 유지
 
         if (newStage != currentStage)
         {
@@ -173,40 +200,42 @@ public class ARPlantGrowthController : MonoBehaviour
         if (currentStage == PlantGrowthStage.Blooming)
             OnPlantFullyGrown();
 
-        Debug.Log("Plant upgraded to {currentStage} - position remains and anchored!");
+        Debug.Log($"Plant upgraded to {currentStage}!");
     }
 
     private GameObject GetPlantPrefab()
     {
-        if (currentStage == PlantGrowthStage.Seed) return null;
-
         switch (selectedPlantType)
         {
             case "sunflower":
+                if (currentStage == PlantGrowthStage.Seed) return seedPrefab; // Seed 단계!
                 if (currentStage == PlantGrowthStage.Sprout) return sunflowerSprout;
                 if (currentStage == PlantGrowthStage.Growing) return sunflowerGrowing;
                 if (currentStage == PlantGrowthStage.Blooming) return sunflowerBlooming;
                 break;
 
             case "rose":
+                if (currentStage == PlantGrowthStage.Seed) return seedPrefab;
                 if (currentStage == PlantGrowthStage.Sprout) return roseSprout;
                 if (currentStage == PlantGrowthStage.Growing) return roseGrowing;
                 if (currentStage == PlantGrowthStage.Blooming) return roseBlooming;
                 break;
 
             case "cactus":
+                if (currentStage == PlantGrowthStage.Seed) return seedPrefab;
                 if (currentStage == PlantGrowthStage.Sprout) return cactusSprout;
                 if (currentStage == PlantGrowthStage.Growing) return cactusGrowing;
                 if (currentStage == PlantGrowthStage.Blooming) return cactusBlooming;
                 break;
 
             case "lavender":
+                if (currentStage == PlantGrowthStage.Seed) return seedPrefab;
                 if (currentStage == PlantGrowthStage.Sprout) return lavenderSprout;
                 if (currentStage == PlantGrowthStage.Growing) return lavenderGrowing;
                 if (currentStage == PlantGrowthStage.Blooming) return lavenderBlooming;
                 break;
         }
-        return null;
+        return seedPrefab; // 기본값
     }
 
     private void LoadPrefabsFromResources()
@@ -269,13 +298,14 @@ public class ARPlantGrowthController : MonoBehaviour
         switch (currentStage)
         {
             case PlantGrowthStage.Sprout:
-                return $"작은 새싹이 돋아났어요!";
+                return "작은 새싹이 돋아났어요!";
             case PlantGrowthStage.Growing:
-                return $"쑥쑥 자라고 있어요!";
+                return "쑥쑥 자라고 있어요!";
             case PlantGrowthStage.Blooming:
-                return $"완전히 피어났어요!";
+                return "완전히 피어났어요!";
+            case PlantGrowthStage.Seed:
             default:
-                return "성장하고 있어요!";
+                return "씨앗이 준비되고 있어요!";
         }
     }
 
@@ -293,9 +323,10 @@ public class ARPlantGrowthController : MonoBehaviour
 
     private void OnPlantFullyGrown()
     {
-        UpdateInstruction($"{GetCurrentPlantName()}(이)가 완전히 피어났어요!\n 당신의 긍정적인 말이 기적을 만들었습니다!");
+        UpdateInstruction($"{GetCurrentPlantName()}(이)가 완전히 피어났어요!\n당신의 긍정적인 말이 기적을 만들었습니다!");
+
         if (voiceController != null)
-            voiceController.OnDayComplete();
+            voiceController.OnDayCompleted();
 
         StartCoroutine(CelebrationEffect());
     }
@@ -309,36 +340,30 @@ public class ARPlantGrowthController : MonoBehaviour
             case 1:
                 currentStage = PlantGrowthStage.Seed;
                 growthPoints = 0f;
-                UpdateInstruction("새로운 식물과 만나보세요!");
+                UpdateInstruction("새로운 화분을 배치해보세요!");
                 break;
 
             case 2:
-                // Day 2: Sprout 상태로 시작
                 currentStage = PlantGrowthStage.Sprout;
                 growthPoints = sproutThreshold;
 
-                // Sprout prefab으로 즉시 교체
                 GameObject sproutPrefab = GetPlantPrefab();
                 if (sproutPrefab != null && placementManager != null)
                 {
                     placementManager.ReplacePlant(sproutPrefab);
                 }
-
-                UpdateInstruction("어제의 새싹이 자라고 있어요!");
+                UpdateInstruction("어제의 씨앗이 새싹이 되었어요!");
                 break;
 
             case 3:
-                // Day 3: Growing 상태로 시작
                 currentStage = PlantGrowthStage.Growing;
                 growthPoints = growingThreshold;
 
-                // Growing prefab으로 즉시 교체
                 GameObject growingPrefab = GetPlantPrefab();
                 if (growingPrefab != null && placementManager != null)
                 {
                     placementManager.ReplacePlant(growingPrefab);
                 }
-
                 UpdateInstruction("드디어 꽃이 필 차례예요!");
                 break;
         }
@@ -347,6 +372,7 @@ public class ARPlantGrowthController : MonoBehaviour
     private IEnumerator CelebrationEffect()
     {
         yield return new WaitForSeconds(1.5f);
+        // 추가 축하 효과들...
     }
 
     private void UpdateInstruction(string message)
@@ -359,15 +385,13 @@ public class ARPlantGrowthController : MonoBehaviour
     {
         growthPoints = 0f;
         currentStage = PlantGrowthStage.Seed;
-
-        if (placementManager != null)
-            placementManager.ResetPlacement();
+        Debug.Log("Growth reset to Seed stage");
     }
 
     private void OnDestroy()
     {
         if (placementManager != null)
-            placementManager.OnPlacementComplete -= OnPlacementComplete;
+            placementManager.OnSeedPlanted -= OnSeedPlanted;
 
         if (voiceController != null)
             voiceController.OnRecognitionSuccess -= OnVoiceSuccess;
