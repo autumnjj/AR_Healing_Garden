@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using TMPro;
 using System.Collections;
 
@@ -51,6 +51,9 @@ public class ARPlantGrowthController : MonoBehaviour
     private PlantGrowthStage currentStage = PlantGrowthStage.Seed;
     private string selectedPlantType = "sunflower";
     private float growthPoints = 0f;
+
+    [Header("ì‹œì—° ì§€ì›")]
+    public bool isDemoMode = true;
 
     private void Awake()
     {
@@ -118,7 +121,7 @@ public class ARPlantGrowthController : MonoBehaviour
         if (imageEffects != null)
             imageEffects.PlayVoiceSuccessEffect();
 
-        UpdateInstruction($"ÀßÇß¾î¿ä! ¼ºÀå Æ÷ÀÎÆ®: {growthPoints:F0}/{maxGrowthPoints} (+{pointsPerVoiceSuccess})");
+        UpdateInstruction($"ì˜í–ˆì–´ìš”! ì„±ì¥ í¬ì¸íŠ¸: {growthPoints:F0}/{maxGrowthPoints} (+{pointsPerVoiceSuccess})");
 
         CheckGrowth();
     }
@@ -266,13 +269,13 @@ public class ARPlantGrowthController : MonoBehaviour
         switch (currentStage)
         {
             case PlantGrowthStage.Sprout:
-                return $"ÀÛÀº »õ½ÏÀÌ µ¸¾Æ³µ¾î¿ä!";
+                return $"ì‘ì€ ìƒˆì‹¹ì´ ë‹ì•„ë‚¬ì–´ìš”!";
             case PlantGrowthStage.Growing:
-                return $"¾¦¾¦ ÀÚ¶ó°í ÀÖ¾î¿ä!";
+                return $"ì‘¥ì‘¥ ìë¼ê³  ìˆì–´ìš”!";
             case PlantGrowthStage.Blooming:
-                return $"¿ÏÀüÈ÷ ÇÇ¾î³µ¾î¿ä!";
+                return $"ì™„ì „íˆ í”¼ì–´ë‚¬ì–´ìš”!";
             default:
-                return "¼ºÀåÇÏ°í ÀÖ¾î¿ä!";
+                return "ì„±ì¥í•˜ê³  ìˆì–´ìš”!";
         }
     }
 
@@ -280,21 +283,65 @@ public class ARPlantGrowthController : MonoBehaviour
     {
         switch (selectedPlantType)
         {
-            case "sunflower": return "ÇØ¹Ù¶ó±â";
-            case "rose": return "Àå¹Ì";
-            case "cactus": return "¼±ÀÎÀå";
-            case "lavender": return "¶óº¥´õ";
-            default: return "½Ä¹°";
+            case "sunflower": return "í•´ë°”ë¼ê¸°";
+            case "rose": return "ì¥ë¯¸";
+            case "cactus": return "ì„ ì¸ì¥";
+            case "lavender": return "ë¼ë²¤ë”";
+            default: return "ì‹ë¬¼";
         }
     }
 
     private void OnPlantFullyGrown()
     {
-        UpdateInstruction($"{GetCurrentPlantName()}(ÀÌ)°¡ ¿ÏÀüÈ÷ ÇÇ¾î³µ¾î¿ä!\n ´ç½ÅÀÇ ±àÁ¤ÀûÀÎ ¸»ÀÌ ±âÀûÀ» ¸¸µé¾ú½À´Ï´Ù!");
+        UpdateInstruction($"{GetCurrentPlantName()}(ì´)ê°€ ì™„ì „íˆ í”¼ì–´ë‚¬ì–´ìš”!\n ë‹¹ì‹ ì˜ ê¸ì •ì ì¸ ë§ì´ ê¸°ì ì„ ë§Œë“¤ì—ˆìŠµë‹ˆë‹¤!");
         if (voiceController != null)
-            voiceController.OnAllComplete();
+            voiceController.OnDayComplete();
 
         StartCoroutine(CelebrationEffect());
+    }
+
+    public void SetStartingStage(int day)
+    {
+        if (!isDemoMode) return;
+
+        switch (day)
+        {
+            case 1:
+                currentStage = PlantGrowthStage.Seed;
+                growthPoints = 0f;
+                UpdateInstruction("ìƒˆë¡œìš´ ì‹ë¬¼ê³¼ ë§Œë‚˜ë³´ì„¸ìš”!");
+                break;
+
+            case 2:
+                // Day 2: Sprout ìƒíƒœë¡œ ì‹œì‘
+                currentStage = PlantGrowthStage.Sprout;
+                growthPoints = sproutThreshold;
+
+                // Sprout prefabìœ¼ë¡œ ì¦‰ì‹œ êµì²´
+                GameObject sproutPrefab = GetPlantPrefab();
+                if (sproutPrefab != null && placementManager != null)
+                {
+                    placementManager.ReplacePlant(sproutPrefab);
+                }
+
+                UpdateInstruction("ì–´ì œì˜ ìƒˆì‹¹ì´ ìë¼ê³  ìˆì–´ìš”!");
+                break;
+
+            case 3:
+                // Day 3: Growing ìƒíƒœë¡œ ì‹œì‘
+                currentStage = PlantGrowthStage.Growing;
+                growthPoints = growingThreshold;
+
+                // Growing prefabìœ¼ë¡œ ì¦‰ì‹œ êµì²´
+                GameObject growingPrefab = GetPlantPrefab();
+                if (growingPrefab != null && placementManager != null)
+                {
+                    placementManager.ReplacePlant(growingPrefab);
+                }
+
+                UpdateInstruction("ë“œë””ì–´ ê½ƒì´ í•„ ì°¨ë¡€ì˜ˆìš”!");
+                break;
+        }
     }
 
     private IEnumerator CelebrationEffect()

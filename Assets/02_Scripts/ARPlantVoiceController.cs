@@ -1,9 +1,9 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
 using System.Collections;
-using UnityEngine.UIElements;
+using System;
 
 
 #if UNITY_ANDROID
@@ -13,10 +13,18 @@ using UnityEngine.Android;
 public class ARPlantVoiceController : MonoBehaviour
 {
     [Header("UI")]
-    public UnityEngine.UI.Button voiceButton;
+    public Button voiceButton;
     public TextMeshProUGUI targetText;
     public TextMeshProUGUI messageText;
-    private UnityEngine.UI.Image buttonImage;
+    private Image buttonImage;
+
+    [Header("ì‹œì—°ìš© ë²„íŠ¼ë“¤")]
+    public Button progressButton;
+
+    [Header("3ì¼ ì‹œìŠ¤í…œ ì„¤ì •")]
+    [SerializeField] private int dailyTargetCount = 3;
+    [SerializeField] private int currentDay = 1;
+    private bool isDayCompleted = false;
 
     [Header("Recognition Settings")]
     [SerializeField] private bool useSpeechRecognition = true;
@@ -32,18 +40,18 @@ public class ARPlantVoiceController : MonoBehaviour
     [Header("User Messages")]
     public string[] encouragementMessages =
     {
-        "Àß ¾Èµé·È¾î¿ä. ´Ù½Ã ¸»ÇØº¸¼¼¿ä!",
-        "Á» ´õ ¶Ç·ÇÇÏ°Ô ¸»ÇØº¸¼¼¿ä!",
-        "´õ Å©°Ô ¸»ÇØº¸¼¼¿ä!"
+        "ì˜ ì•ˆë“¤ë ¸ì–´ìš”. ë‹¤ì‹œ ë§í•´ë³´ì„¸ìš”!",
+        "ì¢€ ë” ë˜ë ·í•˜ê²Œ ë§í•´ë³´ì„¸ìš”!",
+        "ë” í¬ê²Œ ë§í•´ë³´ì„¸ìš”!"
     };
     public string[] successMessages =
     {
-        "ÈÇ¸¢ÇØ¿ä! ½Ä¹°ÀÌ ±â»µÇØ¿ä!",
-        "ÀßÇß¾î¿ä! ½Ä¹°ÀÌ ÀÚ¶ó°í ÀÖ¾î¿ä!",
-        "¿Ïº®ÇØ¿ä! ½Ä¹°ÀÌ »ç¶ûÀ» ´À²¼¾î¿ä!"
+        "í›Œë¥­í•´ìš”! ì‹ë¬¼ì´ ê¸°ë»í•´ìš”!",
+        "ì˜í–ˆì–´ìš”! ì‹ë¬¼ì´ ìë¼ê³  ìˆì–´ìš”!",
+        "ì™„ë²½í•´ìš”! ì‹ë¬¼ì´ ì‚¬ë‘ì„ ëŠê¼ˆì–´ìš”!"
     };
 
-    [Header("±àÁ¤ ¹®Àåµé")]
+    [Header("ê¸ì • ë¬¸ì¥ë“¤")]
     public List<PositiveKeyword> positiveKeywords = new List<PositiveKeyword>();
 
     [System.Serializable]
@@ -53,13 +61,13 @@ public class ARPlantVoiceController : MonoBehaviour
         public List<string> variations = new List<string>();
     }
 
-    // ÇöÀç »óÅÂ
+    // í˜„ì¬ ìƒíƒœ
     private int currentTargetIndex = 0;
     private List<int> remainingTargets = new List<int>();
     private int currentAttemptCount = 0;
     private bool isRecognizing = false;
 
-    // ¸¶ÀÌÅ© °ü·Ã
+    // ë§ˆì´í¬ ê´€ë ¨
     private AudioClip microphoneClip;
     private string microphoneDevice;
     private float[] samples;
@@ -70,21 +78,246 @@ public class ARPlantVoiceController : MonoBehaviour
     private AndroidJavaObject speechRecognizer;
     private AndroidJavaObject unityActivity;
 
-    // Åë°è(¹é±×¶ó¿îµå ¼öÁı)
+    // í†µê³„(ë°±ê·¸ë¼ìš´ë“œ ìˆ˜ì§‘)
     private Dictionary<string, int> speechSuccessCount = new Dictionary<string, int>();
     private Dictionary<string, int> totalAttemptCount = new Dictionary<string, int>();
 
-    // ÀÌº¥Æ®
+    // ì´ë²¤íŠ¸
     public System.Action<string, float, string> OnRecognitionSuccess;
+
+    private CalendarManager calendarManager;
 
     private void Start()
     {
+        calendarManager = FindAnyObjectByType<CalendarManager>();
+
+        InitializeThreeDaySystem();
+
         SetupKeywords();
         InitializeComponents();
-        InitializeTargets();
+        SetupProgressButtons();
         ShowCurrentTarget();
 
         StartCoroutine(CheckPermission());
+    }
+
+    private void SetupProgressButtons()
+    {
+        UpdateProgressButton();
+    }
+
+    private void UpdateProgressButton()
+    {
+        if (progressButton == null) return;
+
+        var buttonText = progressButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        switch (currentDay)
+        {
+            case 1:
+                if (isDayCompleted)
+                {
+                    progressButton.gameObject.SetActive(true);
+                    progressButton.interactable = true;
+                    if (buttonText) buttonText.text = "ì‹œì‘";
+
+                    // ê¸°ì¡´ ë¦¬ìŠ¤ë„ˆ ì œê±°í•˜ê³  Day 2 ì‹œì‘ ë¦¬ìŠ¤ë„ˆ ì¶”ê°€
+                    progressButton.onClick.RemoveAllListeners();
+                    progressButton.onClick.AddListener(() => StartNextDay(2));
+
+                    SetButtonAlpha(progressButton, 1f);
+                }
+                else
+                {
+                    progressButton.gameObject.SetActive(false);
+                }
+                break;
+
+            case 2:
+                if (isDayCompleted)
+                {
+                    progressButton.gameObject.SetActive(true);
+                    progressButton.interactable = true;
+                    if (buttonText) buttonText.text = "ì‹œì‘";
+
+                    progressButton.onClick.RemoveAllListeners();
+                    progressButton.onClick.AddListener(() => StartNextDay(3));
+
+                    SetButtonAlpha(progressButton, 1f);
+                }
+                else
+                {
+                    progressButton.gameObject.SetActive(false);
+                }
+                break;
+
+            case 3:
+                if (isDayCompleted)
+                {
+                    progressButton.gameObject.SetActive(true);
+                    progressButton.interactable = true;
+                    if (buttonText) buttonText.text = "ìƒˆ ì‹ë¬¼ ì‹œì‘";
+
+                    progressButton.onClick.RemoveAllListeners();
+                    progressButton.onClick.AddListener(StartNewPlant);
+
+                    SetButtonAlpha(progressButton, 1f);
+                }
+                else
+                {
+                    progressButton.gameObject.SetActive(false);
+                }
+                break;
+        }
+    }
+
+    private void StartNextDay(int day)
+    {
+        currentDay = day;
+        isDayCompleted = false;
+
+        PlayerPrefs.SetInt("Plant_CurrentDay", currentDay);
+        PlayerPrefs.SetInt("Day_Completed", 0);
+        PlayerPrefs.Save();
+
+        // ì‹ë¬¼ ì„±ì¥ ì»¨íŠ¸ë¡¤ëŸ¬ì— ì•Œë¦¼
+        NotifyPlantGrowthController(day);
+
+        // UI ì—…ë°ì´íŠ¸
+        InitializeDailyTargets();
+        ShowCurrentTarget();
+        UpdateProgressButton();  
+
+        // ìŒì„± ë²„íŠ¼ ë‹¤ì‹œ í™œì„±í™”
+        if (voiceButton != null)
+            voiceButton.interactable = true;
+
+        string message = GetDayStartMessage(day);
+        ShowMessage(message, Color.green);
+    }
+
+    private void StartNewPlant()
+    {
+        // ìƒˆë¡œìš´ ì‹œì‘ ë‚ ì§œ ì„¤ì •
+        PlayerPrefs.SetString("First_Play_Date", DateTime.Now.ToString("yyyy-MM-dd"));
+
+        // 3ì¼ ì‹œìŠ¤í…œ ë¦¬ì…‹
+        PlayerPrefs.DeleteKey("Plant_CurrentDay");
+        PlayerPrefs.DeleteKey("Day_Completed");
+        PlayerPrefs.Save();
+
+        // ìƒíƒœ ì´ˆê¸°í™”
+        currentDay = 1;
+        isDayCompleted = false;
+
+        // ì‹ë¬¼ ìƒíƒœë„ ì´ˆê¸°í™”
+        var plantController = FindAnyObjectByType<ARPlantGrowthController>();
+        if (plantController != null)
+        {
+            plantController.ResetGrowth();  // ì‹ë¬¼ì„ Seed ìƒíƒœë¡œ ë¦¬ì…‹
+        }
+
+        // UI ì—…ë°ì´íŠ¸
+        InitializeDailyTargets();
+        ShowCurrentTarget();
+        UpdateProgressButton();
+
+        if (voiceButton != null)
+            voiceButton.interactable = true;
+
+        ShowMessage("ìƒˆë¡œìš´ ì‹ë¬¼ê³¼ í•¨ê»˜ ìƒˆë¡œìš´ ì—¬ì •ì„ ì‹œì‘í•´ìš”!", Color.green);
+
+        Debug.Log("ìƒˆ ì‹ë¬¼ ì‹œì‘ - ëª¨ë“  ë°ì´í„° ë¦¬ì…‹ë¨");
+    }
+
+    private string GetDayStartMessage(int day)
+    {
+        switch (day)
+        {
+            case 2:
+                return "ì–´ì œì˜ ìƒˆì‹¹ì´ ë” ìë¼ê¸°ë¥¼ ê¸°ë‹¤ë ¤ìš”";
+            case 3:
+                return "ë“œë””ì–´ ì•„ë¦„ë‹¤ìš´ ê½ƒì´ í•„ ì°¨ë¡€ì˜ˆìš”";
+            default:
+                return "ì‹ë¬¼ê³¼ ëŒ€í™”í•´ë³´ì„¸ìš”";
+        }
+    }
+    private void NotifyPlantGrowthController(int day)
+    {
+        var plantController = FindAnyObjectByType<ARPlantGrowthController>();
+        if (plantController != null)
+        {
+            // 2ì¼ì°¨: Sprout ìƒíƒœë¡œ ì‹œì‘
+            // 3ì¼ì°¨: Growing ìƒíƒœë¡œ ì‹œì‘
+            plantController.SetStartingStage(day);
+        }
+    }
+    private void SetButtonAlpha(Button button, float alpha)
+    {
+        if (button == null) return;
+
+        var image = button.GetComponent<Image>();
+        if (image != null)
+        {
+            Color color = image.color;
+            color.a = alpha;
+            image.color = color;
+        }
+    }
+
+    private void InitializeThreeDaySystem()
+    {
+        currentDay = GetOrCreateCurrentDay();
+        isDayCompleted = GetDayCompletedStatus();
+
+        InitializeDailyTargets();
+    }
+
+
+    private int GetOrCreateCurrentDay()
+    {
+        string today = DateTime.Now.ToString("yyyy-MM-dd");
+        string lastDate = PlayerPrefs.GetString("Last_Play_Date", "");
+
+        if(lastDate != today)
+        {
+            int savedDay = PlayerPrefs.GetInt("Plant_CurrentDay", 1);
+
+            if (lastDate != "" && savedDay < 3)
+            {
+                savedDay++;
+            }
+            else if(savedDay >= 3)
+            {
+                savedDay = 1;
+            }
+
+            PlayerPrefs.SetInt("Plant_CurrentDay", savedDay);
+            PlayerPrefs.SetString("Last_Play_Date", today);
+            PlayerPrefs.SetInt("Today_Progress", 0);
+            PlayerPrefs.Save();
+
+            return savedDay;
+        }
+        return PlayerPrefs.GetInt("Plant_CurrentDay", 1);
+    }
+
+    private bool GetDayCompletedStatus()
+    {
+        return PlayerPrefs.GetInt("Day_Completed", 0) == 1;
+    }
+
+    private void InitializeDailyTargets()
+    {
+        remainingTargets.Clear();
+
+        if (isDayCompleted)
+            return;
+
+        for(int i = 0; i < dailyTargetCount; i++)
+        {
+            remainingTargets.Add(i % 3);
+        }
     }
 
     private void SetupKeywords()
@@ -93,49 +326,49 @@ public class ARPlantVoiceController : MonoBehaviour
         {
             new PositiveKeyword
             {
-                keyword = "»ç¶ûÇØ",
-                variations = new List<string> {"»ç¶ûÇÑ´Ù", "»ç¶ûÇØ¿ä", "·´À¯"}
+                keyword = "ì‚¬ë‘í•´",
+                variations = new List<string> {"ì‚¬ë‘í•œë‹¤", "ì‚¬ë‘í•´ìš”", "ëŸ½ìœ "}
                 
             },
             new PositiveKeyword
             {
-                keyword = "¿¹»Ú´Ù",
-                variations = new List<string> {"¿¹»Ú´Ù", "¿¹»µ¿ä", "ÀÌ»µ", "¾Æ¸§´Ù¿ö" }
+                keyword = "ì˜ˆì˜ë‹¤",
+                variations = new List<string> {"ì˜ˆì˜ë‹¤", "ì˜ˆë»ìš”", "ì´ë»", "ì•„ë¦„ë‹¤ì›Œ" }
                 
             },
             new PositiveKeyword
             {
-                keyword = "ÀßÇÏ°í ÀÖ¾î",
-                variations = new List<string> {"ÀßÇß¾î", "ÀßÇØ", "ÀßÇß´Ù", "ÁÁ¾Æ"}
+                keyword = "ì˜í•˜ê³  ìˆì–´",
+                variations = new List<string> {"ì˜í–ˆì–´", "ì˜í•´", "ì˜í–ˆë‹¤", "ì¢‹ì•„"}
                 
             },
             new PositiveKeyword
             {
-                keyword = "Èû³»",
-                variations = new List<string> {"È­ÀÌÆÃ", "ÆÄÀÌÆÃ", "Èû³»¿ä" }
+                keyword = "í˜ë‚´",
+                variations = new List<string> {"í™”ì´íŒ…", "íŒŒì´íŒ…", "í˜ë‚´ìš”" }
                 
             },
             new PositiveKeyword
             {
-                keyword = "°í¸¶¿ö",
-                variations = new List<string> {"°í¸¿´Ù", "°¨»çÇØ", "°¨»çÇÕ´Ï´Ù" }
+                keyword = "ê³ ë§ˆì›Œ",
+                variations = new List<string> {"ê³ ë§™ë‹¤", "ê°ì‚¬í•´", "ê°ì‚¬í•©ë‹ˆë‹¤" }
                 
             },
             new PositiveKeyword
             {
-                keyword = "±¦Âú¾Æ",
-                variations = new List<string> { "±¦Âú´Ù", "¹®Á¦¾ø¾î" }
+                keyword = "ê´œì°®ì•„",
+                variations = new List<string> { "ê´œì°®ë‹¤", "ë¬¸ì œì—†ì–´" }
                 
             },
             new PositiveKeyword
             {
-                keyword = "´ë´ÜÇØ",
-                variations = new List<string> { "´ë´ÜÇÏ´Ù", "ÈÇ¸¢ÇØ", "¸ÚÁ®" }
+                keyword = "ëŒ€ë‹¨í•´",
+                variations = new List<string> { "ëŒ€ë‹¨í•˜ë‹¤", "í›Œë¥­í•´", "ë©‹ì ¸" }
                 
             }
         };
 
-        // Åë°è ÃÊ±âÈ­
+        // í†µê³„ ì´ˆê¸°í™”
         foreach (var keyword in positiveKeywords)
         {
             speechSuccessCount[keyword.keyword] = 0;
@@ -161,7 +394,7 @@ public class ARPlantVoiceController : MonoBehaviour
         if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
         {
             Debug.Log("Requesting microphone permission...");
-            ShowMessage("¸¶ÀÌÅ© Á¢±Ù ±ÇÇÑÀÌ ÇÊ¿äÇØ¿ä", Color.yellow);
+            ShowMessage("ë§ˆì´í¬ ì ‘ê·¼ ê¶Œí•œì´ í•„ìš”í•´ìš”", Color.yellow);
                 
             Permission.RequestUserPermission(Permission.Microphone);
             
@@ -174,18 +407,18 @@ public class ARPlantVoiceController : MonoBehaviour
             
             if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
             {
-               ShowMessage("¸¶ÀÌÅ© ±ÇÇÑÀÌ ÇÊ¿äÇÕ´Ï´Ù. ¼³Á¤¿¡¼­ ±ÇÇÑÀ» Çã¿ëÇØÁÖ¼¼¿ä", Color.red);
+               ShowMessage("ë§ˆì´í¬ ê¶Œí•œì´ í•„ìš”í•©ë‹ˆë‹¤. ì„¤ì •ì—ì„œ ê¶Œí•œì„ í—ˆìš©í•´ì£¼ì„¸ìš”", Color.red);
                 yield break;
             }
             else
             {
-                ShowMessage("¸¶ÀÌÅ© ÁØºñ ¿Ï·á! ½Ä¹°°ú ´ëÈ­ÇØº¸¼¼¿ä."), Color.green);
+                ShowMessage("ë§ˆì´í¬ ì¤€ë¹„ ì™„ë£Œ! ì‹ë¬¼ê³¼ ëŒ€í™”í•´ë³´ì„¸ìš”."), Color.green);
             }
         }
 
 #endif
 
-        // ¸¶ÀÌÅ© ÀåÄ¡ È®ÀÎ
+        // ë§ˆì´í¬ ì¥ì¹˜ í™•ì¸
         CheckMicrophoneDevices();
         yield return null;
     }
@@ -198,12 +431,12 @@ public class ARPlantVoiceController : MonoBehaviour
         {
             unityActivity = new AndroidJavaClass("com.unity3d.player.UnityPlayer")
                 .GetStatic<AndroidJavaObject>("currentActivity");
-            Debug.Log("Android Speech Recognition ÃÊ±âÈ­ ¼º°ø");
+            Debug.Log("Android Speech Recognition ì´ˆê¸°í™” ì„±ê³µ");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Android Speech Recognition ÃÊ±âÈ­ ½ÇÆĞ: {e.Message}");
-            useSpeechRecognition = false; // Æú¹é
+            Debug.LogError($"Android Speech Recognition ì´ˆê¸°í™” ì‹¤íŒ¨: {e.Message}");
+            useSpeechRecognition = false; // í´ë°±
         }
     
 #endif
@@ -223,53 +456,40 @@ public class ARPlantVoiceController : MonoBehaviour
         }
     }
 
-    private void InitializeTargets()
-    {
-        remainingTargets.Clear();
-        for (int i = 0; i < positiveKeywords.Count; i++)
-            remainingTargets.Add(i);
-
-        for (int i = 0; i < remainingTargets.Count; i++)
-        {
-            int temp = remainingTargets[i];
-            int randomIndex = Random.Range(i, remainingTargets.Count);
-            remainingTargets[i] = remainingTargets[randomIndex];
-            remainingTargets[randomIndex] = temp;
-        }
-    }
-
     private void ShowCurrentTarget()
     {
-        if (remainingTargets.Count == 0)
+        if (isDayCompleted)
         {
-            // ¸ğµç ¹®ÀåÀ» ´Ù »ç¿ëÇßÀ¸¸é ¿Ï·á
-            OnAllComplete();
+            OnDayComplete();
             return;
         }
 
-        // ÇöÀç Å¸°Ù ¼³Á¤
+        if(remainingTargets.Count == 0)
+        {
+            OnDayComplete();
+            return;
+        }
+        // í˜„ì¬ íƒ€ê²Ÿ ì„¤ì •
         currentTargetIndex = remainingTargets[0];
         currentAttemptCount = 0;
 
         var currentKeyword = positiveKeywords[currentTargetIndex];
 
         if (targetText != null)
-        {
-           targetText.text = $"µû¶ó ¸»ÇØº¸¼¼¿ä:\n\"{currentKeyword.keyword}\"";
-        }
+            targetText.text = $"ë”°ë¼ ë§í•´ë³´ì„¸ìš”:\n\"{currentKeyword.keyword}\"";
 
-        ShowMessage("¸¶ÀÌÅ© ¹öÆ°À» ´­·¯ ¸»ÇØº¸¼¼¿ä!", Color.white);
+        ShowMessage("ë§ˆì´í¬ ë²„íŠ¼ì„ ëˆŒëŸ¬ ë§í•´ë³´ì„¸ìš”!", Color.white);
     }
 
 
     public void StartRecognition()
     {
-        if (!isRecognizing) return;
+        if (!isRecognizing || isDayCompleted) return;
 
         var currentKeyword = positiveKeywords[remainingTargets[0]];
         totalAttemptCount[currentKeyword.keyword]++;
 
-        // 3¹ø ½ÃµµÇß°Å³ª À½¼ºÀÎ½ÄÀ» »ç¿ëÇÏÁö ¾Ê´Â °æ¿ì -> ¹ßÈ­ °¨Áö
+        // 3ë²ˆ ì‹œë„í–ˆê±°ë‚˜ ìŒì„±ì¸ì‹ì„ ì‚¬ìš©í•˜ì§€ ì•ŠëŠ” ê²½ìš° -> ë°œí™” ê°ì§€
         if (currentAttemptCount >= maxSpeechAttempts || !useSpeechRecognition)
         {
             StartCoroutine(VolumeDetectionMode(currentKeyword));
@@ -285,30 +505,30 @@ public class ARPlantVoiceController : MonoBehaviour
         isRecognizing = true;
         currentAttemptCount++;
 
-        ShowMessage("µè°í ÀÖ¾î¿ä...", Color.green);
+        ShowMessage("ë“£ê³  ìˆì–´ìš”...", Color.green);
         ChangeButtonColor(Color.green);
 
-        // ±âº»°ªÀ¸·Î ½ÇÆĞ Ã³¸®
+        // ê¸°ë³¸ê°’ìœ¼ë¡œ ì‹¤íŒ¨ ì²˜ë¦¬
         string recognizedText = "";
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-        // Android ½Ç±â±â¿¡¼­¸¸ ½ÇÁ¦ À½¼º ÀÎ½Ä
+        // Android ì‹¤ê¸°ê¸°ì—ì„œë§Œ ì‹¤ì œ ìŒì„± ì¸ì‹
         yield return StartCoroutine(AndroidSpeechRecognitionCoroutine((result) => recognizedText = result));
 #else
-        // ¿¡µğÅÍ¿¡¼­´Â °£´ÜÈ÷ ´ë±â¸¸ ÇÏ°í ½ÇÆĞ Ã³¸®
+        // ì—ë””í„°ì—ì„œëŠ” ê°„ë‹¨íˆ ëŒ€ê¸°ë§Œ í•˜ê³  ì‹¤íŒ¨ ì²˜ë¦¬
         yield return new WaitForSeconds(speechTimeout);
-        Debug.Log("[VoiceRecognizer] ¿¡µğÅÍ ¸ğµå - À½¼º ÀÎ½Ä ½ºÅµ");
+        Debug.Log("[VoiceRecognizer] ì—ë””í„° ëª¨ë“œ - ìŒì„± ì¸ì‹ ìŠ¤í‚µ");
 #endif
 
         if (IsKeywordMatched(recognizedText, targetKeyword))
         {
-            // À½¼º ÀÎ½Ä ¼º°ø!
+            // ìŒì„± ì¸ì‹ ì„±ê³µ!
             speechSuccessCount[targetKeyword.keyword]++;
             OnSuccess(targetKeyword, "speech");
         }
         else
         {
-            // ½ÇÆĞ - ÀÚ¿¬½º·´°Ô Àç½Ãµµ À¯µµ
+            // ì‹¤íŒ¨ - ìì—°ìŠ¤ëŸ½ê²Œ ì¬ì‹œë„ ìœ ë„
             OnSpeechRecognitionFailed();
         }
 
@@ -320,7 +540,7 @@ public class ARPlantVoiceController : MonoBehaviour
     {
         isRecognizing = true;
 
-        ShowMessage("¸ñ¼Ò¸®¸¦ µè°í ÀÖ¾î¿ä...", Color.green);
+        ShowMessage("ëª©ì†Œë¦¬ë¥¼ ë“£ê³  ìˆì–´ìš”...", Color.green);
         ChangeButtonColor(Color.green);
 
         bool volumeSuccess = false;
@@ -332,7 +552,7 @@ public class ARPlantVoiceController : MonoBehaviour
         }
         else
         {
-            ShowMessage("Á¶±İ ´õ Å©°Ô ¸»ÇØº¸¼¼¿ä!", Color.orange);
+            ShowMessage("ì¡°ê¸ˆ ë” í¬ê²Œ ë§í•´ë³´ì„¸ìš”!", Color.orange);
         }
 
         ChangeButtonColor(Color.white);
@@ -357,19 +577,19 @@ public class ARPlantVoiceController : MonoBehaviour
 
             yield return new WaitForSeconds(speechTimeout);
             
-            // ½ÇÁ¦ ±¸Çö¿¡¼­´Â Äİ¹éÀ» ÅëÇØ °á°ú¸¦ ¹Ş¾Æ¾ß ÇÕ´Ï´Ù
-            // ÀÓ½Ã·Î ºó ¹®ÀÚ¿­ ¹İÈ¯
+            // ì‹¤ì œ êµ¬í˜„ì—ì„œëŠ” ì½œë°±ì„ í†µí•´ ê²°ê³¼ë¥¼ ë°›ì•„ì•¼ í•©ë‹ˆë‹¤
+            // ì„ì‹œë¡œ ë¹ˆ ë¬¸ìì—´ ë°˜í™˜
             callback("");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[VoiceRecognizer] À½¼º ÀÎ½Ä ¿À·ù: {e.Message}");
+            Debug.LogError($"[VoiceRecognizer] ìŒì„± ì¸ì‹ ì˜¤ë¥˜: {e.Message}");
             callback("");
         }
     }
 #endif
 
-    private IEnumerator VolumeDetectionCoroutine(System.Action<bool> callback)
+    private IEnumerator VolumeDetectionCoroutine(Action<bool> callback)
     {
         speakingTime = 0f;
         currentVolume = 0f;
@@ -400,7 +620,7 @@ public class ARPlantVoiceController : MonoBehaviour
         }
         Microphone.End(microphoneDevice);
 
-        // °á°ú¸¦ Äİ¹éÀ¸·Î Àü´Ş
+        // ê²°ê³¼ë¥¼ ì½œë°±ìœ¼ë¡œ ì „ë‹¬
         bool result = voiceDetected && speakingTime >= minSpeakTime;
         callback(result);
     }
@@ -416,7 +636,7 @@ public class ARPlantVoiceController : MonoBehaviour
         int startPosition = Mathf.Max(0, micPosition - 128);
         microphoneClip.GetData(samples, startPosition);
 
-        // RMS (Root Mean Square) °è»êÀ¸·Î º¼·ı ÃøÁ¤
+        // RMS (Root Mean Square) ê³„ì‚°ìœ¼ë¡œ ë³¼ë¥¨ ì¸¡ì •
         float sum = 0f;
         for (int i = 0; i < samples.Length; i++)
         {
@@ -431,10 +651,10 @@ public class ARPlantVoiceController : MonoBehaviour
 
         recognizedText = recognizedText.ToLower().Trim();
 
-        // Á¤ÇĞÈ÷ ÀÏÄ¡ÇÏ°Å³ª Æ÷ÇÔ
+        // ì •í•™íˆ ì¼ì¹˜í•˜ê±°ë‚˜ í¬í•¨
         if (recognizedText.Contains(targetKeyword.keyword.ToLower())) return true;
 
-        // º¯Çüµé°ú ¸ÅÄª
+        // ë³€í˜•ë“¤ê³¼ ë§¤ì¹­
         foreach(var variation in targetKeyword.variations)
         {
             if (recognizedText.Contains(variation.ToLower())) return true;
@@ -445,29 +665,28 @@ public class ARPlantVoiceController : MonoBehaviour
 
     private void OnSpeechRecognitionFailed()
     {
-        string encouragement = encouragementMessages[Random.Range(0, encouragementMessages.Length)];
+        string encouragement = encouragementMessages[UnityEngine.Random.Range(0, encouragementMessages.Length)];
         ShowMessage(encouragement, Color.orange);
 
         Debug.Log($"[VoiceRecognizer] Voice Rec Failed - Try {currentAttemptCount}/{maxSpeechAttempts}");
 
         if (currentAttemptCount >= maxSpeechAttempts)
         {
-            Debug.Log("[VoiceRecognizer] Next turn ¹ßÈ­ °¨Áö mode");
+            Debug.Log("[VoiceRecognizer] Next turn ë°œí™” ê°ì§€ mode");
         }
     }
 
     private void OnSuccess(PositiveKeyword keyword, string method)
     {
-        string successMessage = successMessages[Random.Range(0, successMessages.Length)];
+        string successMessage = successMessages[UnityEngine.Random.Range(0, successMessages.Length)];
         ShowMessage(successMessage, Color.green);
 
-        Debug.Log($"[VoiceRecognizer] ¼º°ø! Å°¿öµå: {keyword.keyword}, ¹æ¹ı: {method}, ½Ãµµ: {currentAttemptCount}");
+        Debug.Log($"[VoiceRecognizer] ì„±ê³µ! í‚¤ì›Œë“œ: {keyword.keyword}, ë°©ë²•: {method}, ì‹œë„: {currentAttemptCount}");
 
-        // ¼º°ø ÀÌº¥Æ® ¹ß»ı
+        // ì„±ê³µ ì´ë²¤íŠ¸ ë°œìƒ
         OnRecognitionSuccess?.Invoke(keyword.keyword, standardGrowthPoints, method);
 
-
-        // ´ÙÀ½ Å¸°ÙÀ¸·Î
+        // ë‹¤ìŒ íƒ€ê²Ÿìœ¼ë¡œ
         remainingTargets.RemoveAt(0);
         StartCoroutine(DelayedNextTarget());
     }
@@ -497,15 +716,51 @@ public class ARPlantVoiceController : MonoBehaviour
         ShowCurrentTarget();
     }
 
-    public void OnAllComplete()
+    public void OnDayComplete()
     {
-        if (targetText != null)
-            targetText.text = "¸ğµç ÀÀ¿ø ¿Ï·á!";
+        isDayCompleted = true;
 
-        ShowMessage("ÃàÇÏÇØ¿ä! ½Ä¹°ÀÌ ´ç½ÅÀÇ »ç¶ûÀ¸·Î °¡µæ ÀÚ¶ú¾î¿ä!", Color.gold);
+        PlayerPrefs.SetInt("Day_Completed", 1);
+        PlayerPrefs.Save();
+
+        if (calendarManager != null)
+            calendarManager.RecordTodaySpeech();
+
+        string message = GetDayCompletedMessage();
+
+        if (targetText != null)
+            targetText.text = $"ì™„ë£Œ!";
+
+        ShowMessage(message, Color.gold);
 
         if (voiceButton != null)
             voiceButton.interactable = false;
+
+        UpdateProgressButton();
+    }
+
+    private string GetDayCompletedMessage()
+    {
+        switch (currentDay)
+        {
+            case 1:
+                return "ì˜¤ëŠ˜ í• ë‹¹ëŸ‰ ì™„ë£Œ! ì‘ì€ ìƒˆì‹¹ì´ ë‚˜ì™”ì–´ìš”.\në‚´ì¼ ë‹¤ì‹œ ì™€ì„œ ì‹ë¬¼ì„ í‚¤ì›Œë³´ì„¸ìš”!";
+            case 2:
+                return "ì‹ë¬¼ì´ ì‘¥ì‘¥ ìë¼ê³  ìˆì–´ìš”.\në‚´ì¼ì´ë©´ ê½ƒì´ í•„ ê±°ì˜ˆìš”!";
+            case 3:
+                return "ì¶•í•˜í•´ìš”! ì•„ë¦„ë‹¤ìš´ ê½ƒì´ í”¼ì—ˆì–´ìš”.\n3ì¼ê°„ì˜ ì—¬ì •ì„ ì™„ì£¼í–ˆìŠµë‹ˆë‹¤!";
+            default:
+                return "ì˜¤ëŠ˜ ëª©í‘œ ë‹¬ì„±! ë‚´ì¼ ë˜ ë§Œë‚˜ìš”!";
+        }
+    }
+    public bool IsAllComplete()
+    {
+        return isDayCompleted || remainingTargets.Count == 0;
+    }
+
+    public int GetCurrentDay()
+    {
+        return currentDay;
     }
 
     public void SetSpeechRecognition(bool enabled)
@@ -518,10 +773,6 @@ public class ARPlantVoiceController : MonoBehaviour
         return remainingTargets.Count;
     }
 
-    public bool IsAllComplete()
-    {
-        return remainingTargets.Count == 0;
-    }
 }
 
 
